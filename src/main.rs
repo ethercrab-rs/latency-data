@@ -1,4 +1,4 @@
-use crate::system::{is_rt_kernel, tunedadm_profile};
+use crate::system::{ethtool_usecs, is_rt_kernel, network_description, tunedadm_profile};
 use clap::Parser;
 
 mod system;
@@ -20,9 +20,16 @@ async fn main() {
 
     let is_rt = is_rt_kernel().await;
     let tuned_adm_profile = tunedadm_profile().await;
+    let interface_description = network_description(&args.interface).await;
+    let (tx_usecs, rx_usecs) = ethtool_usecs(&args.interface).await;
 
     log::info!("Running tests");
-    log::info!("- Interface: {}", args.interface);
-    log::info!("- Realtime: {}", if is_rt { "yes" } else { "no" });
+    log::info!(
+        "- Interface: {} ({})",
+        args.interface,
+        interface_description
+    );
+    log::info!("- Realtime kernel: {}", if is_rt { "yes" } else { "no" });
     log::info!("- tuned-adm profile: {}", tuned_adm_profile);
+    log::info!("- ethtool tx-usecs/rx-usecs: {}/{}", tx_usecs, rx_usecs);
 }

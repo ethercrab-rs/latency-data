@@ -1083,6 +1083,8 @@ dependencies = [
  "dump-analyser",
  "env_logger",
  "log",
+ "serde",
+ "serde_json",
  "sqlx",
  "tokio",
 ]
