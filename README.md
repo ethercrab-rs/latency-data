@@ -6,7 +6,7 @@ from various system tuning parameters.
 Designed to be analysed with [dump-analyser](https://github.com/ethercrab-rs/dump-analyser), so data
 is imported into Postgres as that's what I'm familiar with.
 
-# The setup
+# Current test machine
 
 Debian 12.2.0 netinst, with no desktop environments installed.
 
@@ -39,6 +39,8 @@ Each test will be run 3 times.
 - Intel i350 (Dell, port 0)
 - Intel i210
 - Intel i225-v
+
+# Tests and config combinations
 
 ## Scenarios
 
@@ -99,7 +101,15 @@ mean? Standard deviation? Both would be interesting - both to see lower latency,
 Tables can be found
 [here](https://www.me.psu.edu/cimbala/me345/Lectures/Taguchi_orthogonal_arrays.pdf).
 
-# Setting Grub default kernel
+# System setup
+
+## Dependencies
+
+```bash
+sudo apt install ethtool lshw
+```
+
+## Setting Grub default kernel
 
 Need to set strings in `/etc/default/grub` like:
 
