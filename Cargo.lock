@@ -1079,6 +1079,7 @@ dependencies = [
 name = "latency-data"
 version = "0.1.0"
 dependencies = [
+ "clap",
  "dump-analyser",
  "env_logger",
  "log",

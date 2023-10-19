@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+clap = { version = "4.4.6", features = ["derive"] }
 dump-analyser = { git = "https://github.com/ethercrab-rs/dump-analyser.git", rev = "50717e7", version = "0.1.0" }
 env_logger = "0.10.0"
 log = "0.4.20"
@@ -13,4 +14,9 @@ sqlx = { version = "0.7.2", default-features = false, features = [
     "postgres",
     "runtime-tokio-rustls",
 ] }
-tokio = { version = "1.33.0", default-features = false, features = ["rt", "process", "macros", "fs"] }
+tokio = { version = "1.33.0", default-features = false, features = [
+    "rt",
+    "process",
+    "macros",
+    "fs",
+] }
