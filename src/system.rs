@@ -1,11 +1,10 @@
-use tokio::process::Command;
+use std::process::Command;
 
 /// Determine whether the kernel has the RT patches enabled or not
-pub async fn is_rt_kernel() -> bool {
+pub fn is_rt_kernel() -> bool {
     let cmd = Command::new("uname")
         .arg("-a")
         .output()
-        .await
         .expect("uname command failed ");
 
     let out = String::from_utf8_lossy(&cmd.stdout);
@@ -15,11 +14,10 @@ pub async fn is_rt_kernel() -> bool {
 }
 
 /// Read `tunedadm` profile
-pub async fn tunedadm_profile() -> String {
+pub fn tunedadm_profile() -> String {
     let cmd = Command::new("tuned-adm")
         .arg("active")
         .output()
-        .await
         .expect("tuned-adm command failed ");
 
     let out = String::from_utf8_lossy(&cmd.stdout);
@@ -31,13 +29,12 @@ pub async fn tunedadm_profile() -> String {
 }
 
 /// Get description of prescribed network device.
-pub async fn network_description(search_device: &str) -> String {
+pub fn network_description(search_device: &str) -> String {
     let cmd = Command::new("lshw")
         .arg("-class")
         .arg("network")
         .arg("-json")
         .output()
-        .await
         .expect("lshw command failed ");
 
     let out: Vec<Device> = serde_json::from_slice(&cmd.stdout).expect("Invalid lshw JSON");
@@ -59,12 +56,11 @@ pub async fn network_description(search_device: &str) -> String {
 }
 
 /// Get `tx-usecs` and `rx-usecs` `ethtool` statistics for the given interface
-pub async fn ethtool_usecs(interface: &str) -> (u32, u32) {
+pub fn ethtool_usecs(interface: &str) -> (u32, u32) {
     let cmd = Command::new("ethtool")
         .arg("-c")
         .arg(interface)
         .output()
-        .await
         .expect("ethtool command failed ");
 
     let out = String::from_utf8_lossy(&cmd.stdout);
