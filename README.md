@@ -56,6 +56,10 @@ Each test will be run 3 times.
 - RT kernel with tunedadm + prio
 - RT kernel with ethtool + tunedadm + prio
 
+`tunedadm` will be this: `sudo tuned-adm profile network-latency`
+
+`ethtool` will be this: `sudo ethtool -C enp1s0f0 tx-usecs 0 rx-usecs 0`
+
 ## Test programs
 
 For the 10 group tests, we don't need 10 devices - we can just send 10 empty LRW. Maybe not totally
