@@ -210,7 +210,13 @@ fn run(
 
     // TODO: Scenario metadata, filename, etc
 
-    let name = format!("{}-{}-{}", scenario_name, settings.slug(), date_slug);
+    let name = format!(
+        "{}-{}-{}-{}",
+        scenario_name,
+        settings.hostname,
+        settings.slug(),
+        date_slug
+    );
 
     let dump_filename = {
         fs::create_dir_all(DUMPS_PATH).expect("Create dumps dir");
