@@ -3,7 +3,7 @@
 use chrono::{DateTime, Utc};
 use ethercrab::{
     slave_group::{Op, PreOp},
-    Client, ClientConfig, PduStorage, SlaveGroup, Timeouts,
+    Client, ClientConfig, PduStorage, SlaveGroup, SlaveGroupState, Timeouts,
 };
 use futures_lite::StreamExt;
 use std::{
@@ -120,7 +120,9 @@ async fn loop_tick(group: &mut Group<Op>, client: &Client<'_>) {
 /// This function forces `smol` to not start an IO thread in the background, giving a more
 /// representative worst case. In real code, one would either use a `static` `PduStorage`, or spawn
 /// scoped threads so it's easier to use `smol::spawn`, `smol::block_on`, etc.
-fn single_thread(settings: &TestSettings) -> Result<Vec<CycleMetadata>, ethercrab::error::Error> {
+fn single_thread(
+    settings: &TestSettings,
+) -> Result<(Vec<CycleMetadata>, u32), ethercrab::error::Error> {
     let storage = PduStorage::new();
 
     let (client, tx_rx) = create_client(&settings.nic, &storage);
@@ -130,7 +132,17 @@ fn single_thread(settings: &TestSettings) -> Result<Vec<CycleMetadata>, ethercra
     local_ex.spawn(tx_rx).detach();
 
     futures_lite::future::block_on(local_ex.run(async move {
-        let [group, ..] = create_groups(&client).await?;
+        let mut groups = create_groups(&client).await?;
+
+        // The time it takes to traverse to the end of the EtherCAT network and back again.
+        let network_propagation_time_ns = groups
+            .iter_mut()
+            .flat_map(|group| group.iter(&client))
+            .map(|device| device.propagation_delay())
+            .max()
+            .expect("Unable to compute prop time");
+
+        let [group, ..] = groups;
 
         let mut group = group.into_op(&client).await.expect("PRE-OP -> OP");
 
@@ -163,7 +175,7 @@ fn single_thread(settings: &TestSettings) -> Result<Vec<CycleMetadata>, ethercra
             prev = Instant::now();
         }
 
-        Ok(cycles)
+        Ok((cycles, network_propagation_time_ns))
     }))
 }
 
@@ -195,11 +207,15 @@ pub struct RunMetadata {
     ///
     /// Does not include anything before process cycle starts.
     cycle_metadata: Vec<CycleMetadata>,
+
+    /// Time for a packet to reach the end of the network and come back, according to EtherCAT's DC
+    /// system.
+    network_propagation_time_ns: u32,
 }
 
 fn run(
     settings: &TestSettings,
-    scenario: impl Fn(&TestSettings) -> Result<Vec<CycleMetadata>, ethercrab::error::Error>,
+    scenario: impl Fn(&TestSettings) -> Result<(Vec<CycleMetadata>, u32), ethercrab::error::Error>,
     scenario_name: &str,
 ) -> Result<RunMetadata, ethercrab::error::Error> {
     let scenario_name = scenario_name.replace('_', "-");
@@ -257,15 +273,16 @@ fn run(
         dump_filename.display()
     );
 
-    let cycle_metadata = scenario(settings)?;
+    let (cycle_metadata, network_propagation_time_ns) = scenario(settings)?;
 
     // Stop tshark
     tshark.kill().expect("Failed to kill tshark");
 
     log::info!(
-        "--> Collected {} process cycles in {} ms",
+        "--> Collected {} process cycles in {} ms, network propagation time {} ns",
         cycle_metadata.len(),
-        start.elapsed().as_millis()
+        start.elapsed().as_millis(),
+        network_propagation_time_ns
     );
 
     Ok(RunMetadata {
@@ -273,6 +290,7 @@ fn run(
         hostname: settings.hostname.clone(),
         name,
         cycle_metadata,
+        network_propagation_time_ns,
     })
 }
 
