@@ -169,7 +169,9 @@ thread only joins them.
   - Histogram
   - Stats: P95, P99, P25/P50 (median)/P75 (quartiles,) min/max, mean, standard deviation
 
-# Side experiment: Taguchi table
+# Future experiments
+
+## Taguchi table experimental approach
 
 See if using a Taguchi table/orthogonal array with whatever the most important result stat is. Maybe
 mean? Standard deviation? Both would be interesting - both to see lower latency, and to see jitter.
@@ -177,9 +179,18 @@ mean? Standard deviation? Both would be interesting - both to see lower latency,
 Tables can be found
 [here](https://www.me.psu.edu/cimbala/me345/Lectures/Taguchi_orthogonal_arrays.pdf).
 
-# Future experiment: multiple controllers
+## Multiple controllers
 
 Run these tests with the above kernel/ethtool/etc options:
 
 - One controller as baseline
 - Two controllers in threads
+
+## Embassy
+
+This would be a reduced set of tests and would need a switch to capture packets. It would also
+probably not capture cycle time jitter as that adds overhead.
+
+Tests would basically be _n_ PDI tasks with nothing like thread prio or ethtool set.
+
+Probably one, 2, 10 tasks.
