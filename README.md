@@ -48,6 +48,20 @@ SATA SSD
 - Intel i210
 - Intel i225-v
 
+## EtherCAT devices
+
+Currently just some random ones thrown on, but they should stay the same for consistency
+
+- EK1100
+- EL2008
+- EL2828
+- EL2889
+- EL1004
+
+There are 10 groups so some will be empty, but that doesn't matter - at least one LRW is always sent
+for every group, and we're just looking at latency, not payload size. That said, testing an enormous
+LRW would be quite interesting.
+
 # Tests and config combinations
 
 ## Running the suite
