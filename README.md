@@ -33,6 +33,42 @@ Only other deliberate task will be `tshark`, started by the test binary.
 
 Each test will be run 3 times.
 
+## System setup
+
+### Dependencies
+
+```bash
+sudo apt install ethtool lshw
+```
+
+### Setting Grub default kernel
+
+Need to set strings in `/etc/default/grub` like:
+
+```
+gnulinux-advanced-8d15ba73-7f16-4fe9-8613-1aa61494e173>gnulinux-6.1.0-13-amd64-advanced-8d15ba73-7f16-4fe9-8613-1aa61494e173
+```
+
+Notice the `>` buried in there. Find the two segments with:
+
+```bash
+# First segment
+sudo grep submenu /boot/grub/grub.cfg
+# Second segment
+sudo grep gnulinux /boot/grub/grub.cfg
+```
+
+Then update and reboot:
+
+```bash
+sudo vim /etc/default/grub
+sudo update-grub
+uname -a
+```
+
+Props to [here](https://www.gnu.org/software/grub/manual/grub/html_node/default.html#default) for
+helping with this.
+
 ## Hardware
 
 i7-3770
@@ -141,38 +177,9 @@ mean? Standard deviation? Both would be interesting - both to see lower latency,
 Tables can be found
 [here](https://www.me.psu.edu/cimbala/me345/Lectures/Taguchi_orthogonal_arrays.pdf).
 
-# System setup
+# Future experiment: multiple controllers
 
-## Dependencies
+Run these tests with the above kernel/ethtool/etc options:
 
-```bash
-sudo apt install ethtool lshw
-```
-
-## Setting Grub default kernel
-
-Need to set strings in `/etc/default/grub` like:
-
-```
-gnulinux-advanced-8d15ba73-7f16-4fe9-8613-1aa61494e173>gnulinux-6.1.0-13-amd64-advanced-8d15ba73-7f16-4fe9-8613-1aa61494e173
-```
-
-Notice the `>` buried in there. Find the two segments with:
-
-```bash
-# First segment
-sudo grep submenu /boot/grub/grub.cfg
-# Second segment
-sudo grep gnulinux /boot/grub/grub.cfg
-```
-
-Then update and reboot:
-
-```bash
-sudo vim /etc/default/grub
-sudo update-grub
-uname -a
-```
-
-Props to [here](https://www.gnu.org/software/grub/manual/grub/html_node/default.html#default) for
-helping with this.
+- One controller as baseline
+- Two controllers in threads
