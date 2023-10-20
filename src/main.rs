@@ -1,11 +1,15 @@
-use std::fs;
-
 use crate::{
     scenarios::{run_all, TestSettings, DUMPS_PATH},
     system::{ethtool_usecs, hostname, is_rt_kernel, network_description, tunedadm_profile},
 };
 use clap::Parser;
+use db::connect_and_init;
+use scenarios::RunMetadata;
+use sqlx::{query, types::Json};
+use std::fs;
+use tokio::runtime::Runtime;
 
+mod db;
 mod scenarios;
 mod system;
 
@@ -30,6 +34,17 @@ pub struct Args {
     /// Remove any previous dumps.
     #[arg(long)]
     pub clean: bool,
+
+    /// Postgres DB URL, like `postgres://ethercrab:ethercrab@localhost:5432/dbname`.
+    #[arg(
+        long,
+        default_value_t = String::from("postgres://ethercrab:ethercrab@localhost:5432/latency")
+    )]
+    pub db: String,
+
+    /// Clean the database of all existing data before inserting new data.
+    #[arg(long)]
+    pub clean_db: bool,
 }
 
 fn main() {
@@ -40,6 +55,8 @@ fn main() {
         net_prio,
         task_prio,
         clean,
+        db,
+        clean_db,
     } = Args::parse();
 
     if clean {
@@ -94,5 +111,70 @@ fn main() {
         cycle_time_us: 1000,
     };
 
-    run_all(&settings).expect("Runs failed");
+    let results = run_all(&settings).expect("Runs failed");
+
+    log::info!("All scenarios executed, ingesting results...");
+
+    let rt = Runtime::new().unwrap();
+    let handle = rt.handle();
+
+    // Execute the future, blocking the current thread until completion
+    handle
+        .block_on(ingest(&settings, &db, clean_db, results))
+        .expect("Ingest failed");
+}
+
+async fn ingest(
+    settings: &TestSettings,
+    db: &str,
+    clean: bool,
+    results: Vec<(&str, RunMetadata)>,
+) -> anyhow::Result<()> {
+    let db = connect_and_init(db).await?;
+
+    if clean {
+        // Postgres will cascade this through to the other tables
+        query("truncate runs cascade").execute(&db).await?;
+    }
+
+    for (scenario_name, result) in results {
+        // Insert a record into `runs`
+        query(
+            r#"insert into runs
+            (date, scenario, name, hostname, propagation_time_ns, settings)
+            values
+            ($1, $2, $3, $4, $5, $6)"#,
+        )
+        .bind(result.date)
+        .bind(scenario_name)
+        .bind(&result.name)
+        .bind(result.hostname)
+        .bind(result.network_propagation_time_ns as i32)
+        .bind(&Json(settings))
+        .execute(&db)
+        .await?;
+
+        // Insert every cycle iteration stat
+        for (counter, cycle) in result.cycle_metadata.iter().enumerate() {
+            query(
+                r#"insert into cycles
+                (run, cycle, processing_time_ns, tick_wait_ns, cycle_time_delta_ns)
+                values
+                ($1, $2, $3, $4, $5)"#,
+            )
+            .bind(&result.name)
+            .bind(counter as i32)
+            .bind(cycle.processing_time_ns as i32)
+            .bind(cycle.tick_wait_ns as i32)
+            .bind(cycle.cycle_time_delta_ns as i32)
+            .execute(&db)
+            .await?;
+        }
+
+        // Process responses
+
+        // Ingest responses
+    }
+
+    Ok(())
 }

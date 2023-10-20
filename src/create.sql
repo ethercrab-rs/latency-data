@@ -26,7 +26,8 @@ create table if not exists "runs" (
   -- PC hostname
   "hostname" character varying(128) not null,
   -- EtherCAT network time
-  "network_propagation_time" integer not null
+  "propagation_time_ns" integer not null,
+  "settings" json not null
 );
 
 -- Idempotent unique constraint
@@ -46,7 +47,7 @@ create table if not exists "cycles" (
   primary key ("id"),
   "run" character varying(128) not null,
   "cycle" integer not null,
-  "processing_time" integer not null,
+  "processing_time_ns" integer not null,
   "tick_wait_ns" integer not null,
   "cycle_time_delta_ns" integer not null
 );
@@ -54,7 +55,7 @@ create table if not exists "cycles" (
 create index if not exists "cycles_scenario" on "cycles" ("run");
 
 alter table "frames"
-add foreign key ("run") references "runs" ("name") on delete no action on update no action;
+add foreign key ("run") references "runs" ("name") on delete cascade on update no action;
 
 alter table "cycles"
-add foreign key ("run") references "runs" ("name") on delete no action on update no action;
+add foreign key ("run") references "runs" ("name") on delete cascade on update no action;

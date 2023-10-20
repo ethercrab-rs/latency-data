@@ -19,6 +19,7 @@ const MAX_FRAMES: usize = 64;
 
 pub const DUMPS_PATH: &str = "./dumps";
 
+#[derive(serde::Serialize)]
 pub struct TestSettings {
     /// Ethernet NIC, e.g. `enp2s0`.
     pub nic: String,
@@ -114,38 +115,38 @@ async fn loop_tick(group: &mut Group<Op>, client: &Client<'_>) {
 #[derive(Debug, Clone)]
 pub struct CycleMetadata {
     /// Time spent processing TX/RX and process data.
-    processing_time_ns: u32,
+    pub processing_time_ns: u32,
 
     /// Time spent waiting for the tick `await` call.
-    tick_wait_ns: u32,
+    pub tick_wait_ns: u32,
 
     /// The time from the same point in the previous cycle.
     ///
     /// Should be close or equal to configured cycle time.
-    cycle_time_delta_ns: u32,
+    pub cycle_time_delta_ns: u32,
 }
 
 #[derive(Debug, Clone)]
 pub struct RunMetadata {
-    date: DateTime<Utc>,
+    pub date: DateTime<Utc>,
 
     /// Scenario name, e.g. `single-thread`.
-    scenario: String,
+    pub scenario: String,
 
     /// Run name.
-    name: String,
+    pub name: String,
 
     /// Metadata: computer hostname to use as an identifier.
-    hostname: String,
+    pub hostname: String,
 
     /// Data recorded for each process cycle in the scenario.
     ///
     /// Does not include anything before process cycle starts.
-    cycle_metadata: Vec<CycleMetadata>,
+    pub cycle_metadata: Vec<CycleMetadata>,
 
     /// Time for a packet to reach the end of the network and come back, according to EtherCAT's DC
     /// system.
-    network_propagation_time_ns: u32,
+    pub network_propagation_time_ns: u32,
 }
 
 fn run(
@@ -232,16 +233,19 @@ fn run(
 /// for each one.
 ///
 /// Network captures are saved to disk inside the `dumps/` folder.
-pub fn run_all(settings: &TestSettings) -> Result<(), ethercrab::error::Error> {
+pub fn run_all(
+    settings: &TestSettings,
+) -> Result<Vec<(&'static str, RunMetadata)>, ethercrab::error::Error> {
     let scenarios = vec![(single_thread, "single_thread")];
 
-    for (scenario_fn, scenario_name) in scenarios {
-        run(settings, scenario_fn, &scenario_name)?;
+    scenarios
+        .into_iter()
+        .map(|(scenario_fn, scenario_name)| {
+            run(settings, scenario_fn, &scenario_name).map(|result| (scenario_name, result))
 
-        // TODO: Add a sleep here to let system chill out a bit?
-    }
-
-    Ok(())
+            // TODO: Add a sleep here to let system chill out a bit?
+        })
+        .collect::<Result<Vec<_>, _>>()
 }
 
 // TODO
