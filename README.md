@@ -50,6 +50,24 @@ SATA SSD
 
 # Tests and config combinations
 
+## Running the suite
+
+During development, use `just`:
+
+```bash
+# --clean will remove any existing capture files
+just run --interface enp2s0 --task-prio 48 --net-prio 49 --clean
+```
+
+On a target machine, we need do the setcap dance OR run the thing as root
+
+```bash
+# Optional
+sudo setcap cap_net_raw=pe ./latency-data
+
+sudo ./latency-data --interface enp2s0 --task-prio 48 --net-prio 49
+```
+
 ## Scenarios
 
 - Normal kernel
