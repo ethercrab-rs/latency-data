@@ -79,3 +79,12 @@ pub fn ethtool_usecs(interface: &str) -> (u32, u32) {
 
     (tx_usecs, rx_usecs)
 }
+
+/// Get machine hostname.
+pub fn hostname() -> String {
+    let output = Command::new("hostname")
+        .output()
+        .expect("could not run hostname command");
+
+    String::from_utf8_lossy(&output.stdout).trim().to_string()
+}

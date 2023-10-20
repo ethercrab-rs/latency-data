@@ -1,11 +1,18 @@
 //! Different application scenarios to (hopefully) represent somewhat realistic scenarios.
 
+use chrono::{DateTime, Utc};
 use ethercrab::{
     slave_group::{Op, PreOp},
     Client, ClientConfig, PduStorage, SlaveGroup, Timeouts,
 };
 use futures_lite::StreamExt;
-use std::{future::Future, time::Duration};
+use std::{
+    fs,
+    future::Future,
+    path::PathBuf,
+    process::Stdio,
+    time::{Duration, Instant},
+};
 
 /// Maximum number of slaves that can be stored. This must be a power of 2 greater than 1.
 const MAX_SLAVES: usize = 16;
@@ -14,21 +21,40 @@ const MAX_PDU_DATA: usize = 1100;
 /// Maximum number of EtherCAT frames that can be in flight at any one time.
 const MAX_FRAMES: usize = 64;
 
+pub const DUMPS_PATH: &str = "./dumps";
+
 pub struct TestSettings {
     /// Ethernet NIC, e.g. `enp2s0`.
-    nic: String,
+    pub nic: String,
+
+    /// Machine hostname.
+    pub hostname: String,
 
     /// Whether we are running an RT kernel or not.
-    is_rt: bool,
+    pub is_rt: bool,
 
     /// If RT is enabled, this is the priority to set for thread that handles network IO.
-    net_prio: u32,
+    pub net_prio: u32,
 
     /// If RT is enabled, this is the priority to set for thread(s) that handle PDI tasks.
-    task_prio: u32,
+    pub task_prio: u32,
 
     /// Cycle time in microseconds.
-    cycle_time_us: u32,
+    pub cycle_time_us: u32,
+}
+
+impl TestSettings {
+    /// Get a hyphenated slug to insert into a filename, test name, etc.
+    pub fn slug(&self) -> String {
+        format!(
+            "{}-{}-n{}-t{}-{}us",
+            self.nic,
+            if self.is_rt { "rt" } else { "nort" },
+            self.net_prio,
+            self.task_prio,
+            self.cycle_time_us
+        )
+    }
 }
 
 /// Create an EtherCrab client and TX/RX task ready to be used and spawned respectively.
@@ -94,7 +120,7 @@ async fn loop_tick(group: &mut Group<Op>, client: &Client<'_>) {
 /// This function forces `smol` to not start an IO thread in the background, giving a more
 /// representative worst case. In real code, one would either use a `static` `PduStorage`, or spawn
 /// scoped threads so it's easier to use `smol::spawn`, `smol::block_on`, etc.
-pub fn single_thread(settings: &TestSettings) -> Result<(), ethercrab::error::Error> {
+fn single_thread(settings: &TestSettings) -> Result<Vec<CycleMetadata>, ethercrab::error::Error> {
     let storage = PduStorage::new();
 
     let (client, tx_rx) = create_client(&settings.nic, &storage);
@@ -110,15 +136,154 @@ pub fn single_thread(settings: &TestSettings) -> Result<(), ethercrab::error::Er
 
         let mut tick = smol::Timer::interval(Duration::from_micros(settings.cycle_time_us.into()));
 
-        // Collect 5000 samples
-        for _ in 0..5000 {
+        let mut prev = Instant::now();
+
+        let iterations = 5000usize;
+        let mut cycles = Vec::with_capacity(iterations);
+
+        for _ in 0..iterations {
+            let loop_start = Instant::now();
+
             loop_tick(&mut group, &client).await;
 
+            let processing_time_ns = loop_start.elapsed().as_nanos();
+
             tick.next().await;
+
+            let tick_wait_ns = loop_start.elapsed().as_nanos() - processing_time_ns;
+
+            let cycle_time_delta_ns = prev.elapsed().as_nanos();
+
+            cycles.push(CycleMetadata {
+                processing_time_ns: processing_time_ns as u32,
+                tick_wait_ns: tick_wait_ns as u32,
+                cycle_time_delta_ns: cycle_time_delta_ns as u32,
+            });
+
+            prev = Instant::now();
         }
 
-        Ok(())
+        Ok(cycles)
     }))
+}
+
+#[derive(Debug, Clone)]
+pub struct CycleMetadata {
+    /// Time spent processing TX/RX and process data.
+    processing_time_ns: u32,
+
+    /// Time spent waiting for the tick `await` call.
+    tick_wait_ns: u32,
+
+    /// The time from the same point in the previous cycle.
+    ///
+    /// Should be close or equal to configured cycle time.
+    cycle_time_delta_ns: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct RunMetadata {
+    date: DateTime<Utc>,
+
+    /// Run name.
+    name: String,
+
+    /// Metadata: computer hostname to use as an identifier.
+    hostname: String,
+
+    /// Data recorded for each process cycle in the scenario.
+    ///
+    /// Does not include anything before process cycle starts.
+    cycle_metadata: Vec<CycleMetadata>,
+}
+
+fn run(
+    settings: &TestSettings,
+    scenario: impl Fn(&TestSettings) -> Result<Vec<CycleMetadata>, ethercrab::error::Error>,
+    scenario_name: &str,
+) -> Result<RunMetadata, ethercrab::error::Error> {
+    let scenario_name = scenario_name.replace('_', "-");
+
+    let now = Utc::now();
+
+    let date_slug = now.format("%Y-%m-%d-%H:%M:%S").to_string();
+
+    // TODO: Scenario metadata, filename, etc
+
+    let name = format!("{}-{}-{}", scenario_name, settings.slug(), date_slug);
+
+    let dump_filename = {
+        fs::create_dir_all(DUMPS_PATH).expect("Create dumps dir");
+
+        let mut path = PathBuf::from(DUMPS_PATH)
+            .canonicalize()
+            .expect("Create dumps path");
+
+        path.push(&name);
+
+        path.set_extension("pcapng");
+
+        path
+    };
+
+    let start = Instant::now();
+
+    let mut tshark = {
+        let mut cmd = std::process::Command::new("tshark");
+
+        cmd.stdout(Stdio::null()).stderr(Stdio::null()).args(&[
+            "-w",
+            dump_filename.display().to_string().as_str(),
+            "--interface",
+            "enp2s0",
+            "-f",
+            "ether proto 0x88a4",
+        ]);
+
+        log::debug!("Running capture command {:?}", cmd);
+
+        cmd.spawn().expect("Could not spawn tshark command")
+    };
+
+    log::info!(
+        "Running scenario {}, saving to {}",
+        scenario_name,
+        dump_filename.display()
+    );
+
+    let cycle_metadata = scenario(settings)?;
+
+    // Stop tshark
+    tshark.kill().expect("Failed to kill tshark");
+
+    log::info!(
+        "--> Collected {} process cycles in {} ms",
+        cycle_metadata.len(),
+        start.elapsed().as_millis()
+    );
+
+    Ok(RunMetadata {
+        date: now,
+        hostname: settings.hostname.clone(),
+        name,
+        cycle_metadata,
+    })
+}
+
+/// Run all scenarios sequentially while capturing network traffic in the background with `tshark`
+/// for each one.
+///
+/// Network captures are saved to disk inside the `dumps/` folder.
+pub fn run_all(settings: &TestSettings) -> Result<(), ethercrab::error::Error> {
+    let scenarios = vec![(single_thread, "single_thread")];
+
+    for (scenario_fn, scenario_name) in scenarios {
+        run(settings, scenario_fn, &scenario_name)?;
+
+        // TODO: Add a sleep here to let system chill out a bit?
+    }
+
+    Ok(())
 }
 
 // TODO
