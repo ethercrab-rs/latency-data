@@ -129,6 +129,9 @@ pub struct CycleMetadata {
 pub struct RunMetadata {
     date: DateTime<Utc>,
 
+    /// Scenario name, e.g. `single-thread`.
+    scenario: String,
+
     /// Run name.
     name: String,
 
@@ -155,8 +158,6 @@ fn run(
     let now = Utc::now();
 
     let date_slug = now.format("%Y-%m-%d-%H:%M:%S").to_string();
-
-    // TODO: Scenario metadata, filename, etc
 
     let name = format!(
         "{}-{}-{}-{}",
@@ -223,6 +224,7 @@ fn run(
         name,
         cycle_metadata,
         network_propagation_time_ns,
+        scenario: scenario_name,
     })
 }
 
