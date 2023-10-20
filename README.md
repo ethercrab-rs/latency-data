@@ -6,6 +6,8 @@ from various system tuning parameters.
 Designed to be analysed with [dump-analyser](https://github.com/ethercrab-rs/dump-analyser), so data
 is imported into Postgres as that's what I'm familiar with.
 
+The Postgres server and other analysis stuff will be run on a separate machine.
+
 # Current test machine
 
 Debian 12.2.0 netinst, with no desktop environments installed.
@@ -32,6 +34,12 @@ Only other deliberate task will be `tshark`, started by the test binary.
 Each test will be run 3 times.
 
 ## Hardware
+
+i7-3770
+
+TODO: RAM size
+
+SATA SSD
 
 - Integrated NIC
   - SSH will be run through this most of the time, unless it's in use by a test, then i350 port 3
