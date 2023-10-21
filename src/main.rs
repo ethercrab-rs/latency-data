@@ -210,10 +210,10 @@ async fn ingest(db: &str, clean: bool, results: Vec<(&str, RunMetadata)>) -> any
         log::info!("--> Cycles done");
 
         // Skip all init packets by looking for a first LRW, which is a good canary for cyclic data
-        // start.
-        let reader = PcapFile::new(&dump_path(&result.name)).skip_while(|packet| {
-            !matches!(packet.command, Command::Write(Writes::Lrw { .. })) && !packet.from_master
-        });
+        // start. Once found, only look for LRW frames.
+        let reader = PcapFile::new(&dump_path(&result.name))
+            .skip_while(|packet| !matches!(packet.command, Command::Write(Writes::Lrw { .. })))
+            .filter(|packet| matches!(packet.command, Command::Write(Writes::Lrw { .. })));
 
         let cycle_packets = reader.collect::<Vec<_>>();
         let first_packet = cycle_packets.first().expect("Empty dump");
