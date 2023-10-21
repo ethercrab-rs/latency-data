@@ -54,8 +54,14 @@ create table if not exists "cycles" (
 
 create index if not exists "cycles_scenario" on "cycles" ("run");
 
-alter table "frames"
-add foreign key ("run") references "runs" ("name") on delete cascade on update no action;
+-- Idempotent foreign key
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'frames_run_fkey') then
+    alter table "frames"
+    add foreign key ("run") references "runs" ("name") on delete cascade on update no action;
 
-alter table "cycles"
-add foreign key ("run") references "runs" ("name") on delete cascade on update no action;
+    alter table "cycles"
+    add foreign key ("run") references "runs" ("name") on delete cascade on update no action;
+  end if;
+end $$;

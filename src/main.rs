@@ -255,8 +255,6 @@ async fn ingest(db: &str, clean: bool, results: Vec<(&str, RunMetadata)>) -> any
             }
         }
 
-        log::info!("--> Prepared frames");
-
         let mut acq = db.acquire().await.unwrap();
 
         let mut copy = acq.copy_in_raw("copy frames (run, packet_number, index, command, tx_time_ns, rx_time_ns, delta_time_ns) from stdin (format csv, delimiter '|')").await.expect("COPY cmd");
