@@ -51,6 +51,10 @@ pub struct Args {
     /// Number of times to run each scenario.
     #[arg(long, default_value_t = 1)]
     pub repeat: u32,
+
+    /// Filter scenarios to those containing this string.
+    #[arg(long)]
+    pub filter: Option<String>,
 }
 
 fn main() {
@@ -65,12 +69,18 @@ fn main() {
         db,
         clean_db,
         repeat,
+        filter,
     } = Args::parse();
 
     if clean {
         log::warn!("Removing all previous dumps");
 
-        fs::remove_dir_all(DUMPS_PATH).expect("Failed to clean");
+        // Ignore errors
+        let _ = fs::remove_dir_all(DUMPS_PATH);
+    }
+
+    if let Some(filter) = filter.as_ref() {
+        log::info!("Filtering scenarios with filter {:?}", filter);
     }
 
     let is_rt = is_rt_kernel();
@@ -121,7 +131,7 @@ fn main() {
     };
 
     for _ in 0..repeat {
-        results.extend(run_all(&settings).expect("1000us runs failed"));
+        results.extend(run_all(&settings, &filter).expect("1000us runs failed"));
     }
 
     let settings = TestSettings {
@@ -134,7 +144,7 @@ fn main() {
     };
 
     for _ in 0..repeat {
-        results.extend(run_all(&settings).expect("100us runs failed"));
+        results.extend(run_all(&settings, &filter).expect("100us runs failed"));
     }
 
     log::info!("All scenarios executed, ingesting results...");

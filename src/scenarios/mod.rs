@@ -6,6 +6,7 @@ use ethercrab::{
     Client, ClientConfig, PduStorage, SlaveGroup, Timeouts,
 };
 use single_thread::single_thread;
+use single_thread_10_tasks::single_thread_10_tasks;
 use single_thread_2_tasks::single_thread_2_tasks;
 use std::{
     fs,
@@ -16,6 +17,7 @@ use std::{
 };
 
 mod single_thread;
+mod single_thread_10_tasks;
 mod single_thread_2_tasks;
 
 /// Maximum number of slaves that can be stored. This must be a power of 2 greater than 1.
@@ -260,6 +262,7 @@ pub fn dump_path(name: &str) -> PathBuf {
 /// Network captures are saved to disk inside the `dumps/` folder.
 pub fn run_all(
     settings: &TestSettings,
+    filter: &Option<String>,
 ) -> Result<Vec<(&'static str, RunMetadata)>, ethercrab::error::Error> {
     let scenarios: Vec<(
         &dyn Fn(&TestSettings) -> Result<(Vec<CycleMetadata>, u32), ethercrab::error::Error>,
@@ -267,12 +270,24 @@ pub fn run_all(
     )> = vec![
         (&single_thread, "1thr"),
         (&single_thread_2_tasks, "1thr-2task"),
+        (&single_thread_10_tasks, "1thr-10task"),
     ];
 
     scenarios
         .into_iter()
-        .map(|(scenario_fn, scenario_name)| {
-            run(settings, scenario_fn, &scenario_name).map(|result| (scenario_name, result))
+        .filter_map(|(scenario_fn, scenario_name)| {
+            if let Some(filter) = filter {
+                if scenario_name.contains(filter) {
+                    Some(
+                        run(settings, scenario_fn, &scenario_name)
+                            .map(|result| (scenario_name, result)),
+                    )
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         })
         .collect::<Result<Vec<_>, _>>()
 }
