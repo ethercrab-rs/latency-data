@@ -6,9 +6,17 @@ use ethercrab::{
     Client, ClientConfig, PduStorage, SlaveGroup, Timeouts,
 };
 use single_thread::single_thread;
-use std::{fs, future::Future, path::PathBuf, process::Stdio, time::Instant};
+use single_thread_2_tasks::single_thread_2_tasks;
+use std::{
+    fs,
+    future::Future,
+    path::PathBuf,
+    process::Stdio,
+    time::{Duration, Instant},
+};
 
 mod single_thread;
+mod single_thread_2_tasks;
 
 /// Maximum number of slaves that can be stored. This must be a power of 2 greater than 1.
 const MAX_SLAVES: usize = 16;
@@ -158,7 +166,7 @@ fn run(
 
     let now = Utc::now();
 
-    let date_slug = now.format("%Y-%m-%d-%H:%M:%S").to_string();
+    let date_slug = now.timestamp();
 
     let name = format!(
         "{}-{}-{}-{}",
@@ -197,8 +205,12 @@ fn run(
 
     let (cycle_metadata, network_propagation_time_ns) = scenario(settings)?;
 
+    std::thread::sleep(Duration::from_millis(100));
+
     // Stop tshark
     tshark.kill().expect("Failed to kill tshark");
+
+    std::thread::sleep(Duration::from_millis(100));
 
     log::info!(
         "--> Collected {} process cycles in {} ms, network propagation time {} ns",
@@ -239,7 +251,13 @@ pub fn dump_path(name: &str) -> PathBuf {
 pub fn run_all(
     settings: &TestSettings,
 ) -> Result<Vec<(&'static str, RunMetadata)>, ethercrab::error::Error> {
-    let scenarios = vec![(single_thread, "single_thread")];
+    let scenarios: Vec<(
+        &dyn Fn(&TestSettings) -> Result<(Vec<CycleMetadata>, u32), ethercrab::error::Error>,
+        &'static str,
+    )> = vec![
+        (&single_thread, "1thr"),
+        (&single_thread_2_tasks, "1thr-2task"),
+    ];
 
     scenarios
         .into_iter()

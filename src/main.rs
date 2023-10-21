@@ -54,7 +54,8 @@ pub struct Args {
 }
 
 fn main() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info,sqlx=error"))
+        .init();
 
     let Args {
         interface,
@@ -165,24 +166,27 @@ async fn ingest(
         .execute(&db)
         .await?;
 
+        let mut counter = 0;
+
         // Insert every cycle iteration stat
-        QueryBuilder::new(
-            r#"insert into cycles
-            (run, cycle, processing_time_ns, tick_wait_ns, cycle_time_delta_ns) "#,
-        )
-        .push_values(
-            result.cycle_metadata.iter().enumerate(),
-            |mut b, (counter, cycle)| {
+        for chunk in result.cycle_metadata.chunks(5000) {
+            QueryBuilder::new(
+                r#"insert into cycles
+                (run, cycle, processing_time_ns, tick_wait_ns, cycle_time_delta_ns) "#,
+            )
+            .push_values(chunk.iter(), |mut b, cycle| {
                 b.push_bind(&result.name)
                     .push_bind(counter as i32)
                     .push_bind(cycle.processing_time_ns as i32)
                     .push_bind(cycle.tick_wait_ns as i32)
                     .push_bind(cycle.cycle_time_delta_ns as i32);
-            },
-        )
-        .build()
-        .execute(&db)
-        .await?;
+
+                counter += 1;
+            })
+            .build()
+            .execute(&db)
+            .await?;
+        }
 
         // Skip all init packets by looking for a first LRW, which is a good canary for cyclic data
         // start.
@@ -212,12 +216,19 @@ async fn ingest(
             }
             // Response to existing sent PDU
             else {
+                println!(
+                    "Find packet {} ({}) (scenario {})",
+                    packet.index, packet.index as i16, result.name
+                );
+
+                // dbg!(&scratch[(scratch.len().saturating_sub(20))..]);
+
                 // Find last sent PDU with this receive PDU's same index
                 let sent = scratch
                     .iter_mut()
                     .rev()
-                    .find(|stat| stat.index == packet.index as i16)
-                    .expect("Could not find sent packet");
+                    .find(|stat| dbg!(dbg!(stat.index) == dbg!(packet.index as i16)))
+                    .expect(&format!("Could not find sent packet {}", packet.index));
 
                 sent.rx_time_ns = (packet.time - start_offset).as_nanos() as i64;
                 sent.delta_time_ns = (sent.rx_time_ns - sent.tx_time_ns) as i32;
@@ -248,6 +259,7 @@ async fn ingest(
 }
 
 /// Database representation of a TX/RX cycle.
+#[derive(Debug)]
 struct Packet {
     packet_number: i32,
     index: i16,
