@@ -47,6 +47,10 @@ pub struct Args {
     /// Clean the database of all existing data before inserting new data.
     #[arg(long)]
     pub clean_db: bool,
+
+    /// Number of times to run each scenario.
+    #[arg(long, default_value_t = 1)]
+    pub repeat: u32,
 }
 
 fn main() {
@@ -59,6 +63,7 @@ fn main() {
         clean,
         db,
         clean_db,
+        repeat,
     } = Args::parse();
 
     if clean {
@@ -113,7 +118,11 @@ fn main() {
         cycle_time_us: 1000,
     };
 
-    let results = run_all(&settings).expect("Runs failed");
+    let mut results = Vec::new();
+
+    for _ in 0..repeat {
+        results.extend(run_all(&settings).expect("Runs failed"));
+    }
 
     log::info!("All scenarios executed, ingesting results...");
 
@@ -215,22 +224,24 @@ async fn ingest(
             }
         }
 
-        QueryBuilder::new(
-            r#"insert into frames
+        for chunk in scratch.chunks(5000) {
+            QueryBuilder::new(
+                r#"insert into frames
             (run, packet_number, index, command, tx_time_ns, rx_time_ns, delta_time_ns) "#,
-        )
-        .push_values(scratch, |mut b, packet| {
-            b.push_bind(&result.name)
-                .push_bind(packet.packet_number)
-                .push_bind(packet.index)
-                .push_bind(packet.command)
-                .push_bind(packet.tx_time_ns)
-                .push_bind(packet.rx_time_ns)
-                .push_bind(packet.delta_time_ns);
-        })
-        .build()
-        .execute(&db)
-        .await?;
+            )
+            .push_values(chunk, |mut b, packet| {
+                b.push_bind(&result.name)
+                    .push_bind(packet.packet_number)
+                    .push_bind(packet.index)
+                    .push_bind(&packet.command)
+                    .push_bind(packet.tx_time_ns)
+                    .push_bind(packet.rx_time_ns)
+                    .push_bind(packet.delta_time_ns);
+            })
+            .build()
+            .execute(&db)
+            .await?;
+        }
     }
 
     Ok(())
