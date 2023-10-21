@@ -194,3 +194,8 @@ probably not capture cycle time jitter as that adds overhead.
 Tests would basically be _n_ PDI tasks with nothing like thread prio or ethtool set.
 
 Probably one, 2, 10 tasks.
+
+## Raspberry Pi 4
+
+I don't have a 5 unfortunately, but either way it would be cool to see how good we can get the rPi
+for use in smaller setups.
