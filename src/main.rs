@@ -216,18 +216,11 @@ async fn ingest(
             }
             // Response to existing sent PDU
             else {
-                println!(
-                    "Find packet {} ({}) (scenario {})",
-                    packet.index, packet.index as i16, result.name
-                );
-
-                // dbg!(&scratch[(scratch.len().saturating_sub(20))..]);
-
                 // Find last sent PDU with this receive PDU's same index
                 let sent = scratch
                     .iter_mut()
                     .rev()
-                    .find(|stat| dbg!(dbg!(stat.index) == dbg!(packet.index as i16)))
+                    .find(|stat| stat.index == packet.index as i16)
                     .expect(&format!("Could not find sent packet {}", packet.index));
 
                 sent.rx_time_ns = (packet.time - start_offset).as_nanos() as i64;

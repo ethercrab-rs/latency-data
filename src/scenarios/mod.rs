@@ -197,6 +197,9 @@ fn run(
         cmd.spawn().expect("Could not spawn tshark command")
     };
 
+    // Let tshark settle in. It might miss packets if this delay is not here.
+    std::thread::sleep(Duration::from_millis(200));
+
     log::info!(
         "Running scenario {}, saving to {}",
         scenario_name,
@@ -263,8 +266,6 @@ pub fn run_all(
         .into_iter()
         .map(|(scenario_fn, scenario_name)| {
             run(settings, scenario_fn, &scenario_name).map(|result| (scenario_name, result))
-
-            // TODO: Add a sleep here to let system chill out a bit?
         })
         .collect::<Result<Vec<_>, _>>()
 }
