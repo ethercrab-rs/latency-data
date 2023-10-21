@@ -255,24 +255,39 @@ async fn ingest(db: &str, clean: bool, results: Vec<(&str, RunMetadata)>) -> any
             }
         }
 
-        for chunk in scratch.chunks(5000) {
-            QueryBuilder::new(
-                r#"insert into frames
-            (run, packet_number, index, command, tx_time_ns, rx_time_ns, delta_time_ns) "#,
-            )
-            .push_values(chunk, |mut b, packet| {
-                b.push_bind(&result.name)
-                    .push_bind(packet.packet_number)
-                    .push_bind(packet.index)
-                    .push_bind(&packet.command)
-                    .push_bind(packet.tx_time_ns)
-                    .push_bind(packet.rx_time_ns)
-                    .push_bind(packet.delta_time_ns);
-            })
-            .build()
-            .execute(&db)
-            .await?;
+        log::info!("--> Prepared frames");
+
+        let mut acq = db.acquire().await.unwrap();
+
+        let mut copy = acq.copy_in_raw("copy frames (run, packet_number, index, command, tx_time_ns, rx_time_ns, delta_time_ns) from stdin (format csv, delimiter '|')").await.expect("COPY cmd");
+
+        let rows = scratch.into_iter().map(
+            |Packet {
+                 packet_number,
+                 index,
+                 command,
+                 tx_time_ns,
+                 rx_time_ns,
+                 delta_time_ns,
+             }| {
+                format!(
+                    "{}|{}|{}|{}|{}|{}|{}\n",
+                    result.name,
+                    packet_number,
+                    index,
+                    command,
+                    tx_time_ns,
+                    rx_time_ns,
+                    delta_time_ns,
+                )
+            },
+        );
+
+        for row in rows {
+            copy.read_from(row.as_bytes()).await.expect("COPY row");
         }
+
+        copy.finish().await.unwrap();
 
         log::info!("--> Frames done");
     }
