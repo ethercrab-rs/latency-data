@@ -109,20 +109,32 @@ fn main() {
 
     // ---
 
+    let mut results = Vec::new();
+
+    let settings = TestSettings {
+        nic: interface.clone(),
+        is_rt,
+        net_prio,
+        task_prio,
+        hostname: hostname.clone(),
+        cycle_time_us: 1000,
+    };
+
+    for _ in 0..repeat {
+        results.extend(run_all(&settings).expect("1000us runs failed"));
+    }
+
     let settings = TestSettings {
         nic: interface,
         is_rt,
         net_prio,
         task_prio,
         hostname,
-        // TODO: Another set of runs with 100us.
-        cycle_time_us: 1000,
+        cycle_time_us: 100,
     };
 
-    let mut results = Vec::new();
-
     for _ in 0..repeat {
-        results.extend(run_all(&settings).expect("Runs failed"));
+        results.extend(run_all(&settings).expect("100us runs failed"));
     }
 
     log::info!("All scenarios executed, ingesting results...");
@@ -132,16 +144,11 @@ fn main() {
 
     // Execute the future, blocking the current thread until completion
     handle
-        .block_on(ingest(&settings, &db, clean_db, results))
+        .block_on(ingest(&db, clean_db, results))
         .expect("Ingest failed");
 }
 
-async fn ingest(
-    settings: &TestSettings,
-    db: &str,
-    clean: bool,
-    results: Vec<(&str, RunMetadata)>,
-) -> anyhow::Result<()> {
+async fn ingest(db: &str, clean: bool, results: Vec<(&str, RunMetadata)>) -> anyhow::Result<()> {
     let db = connect_and_init(db).await?;
 
     if clean {
@@ -162,7 +169,7 @@ async fn ingest(
         .bind(&result.name)
         .bind(result.hostname)
         .bind(result.network_propagation_time_ns as i32)
-        .bind(&Json(settings))
+        .bind(&Json(result.settings))
         .execute(&db)
         .await?;
 

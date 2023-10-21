@@ -27,7 +27,7 @@ const MAX_FRAMES: usize = 64;
 
 pub const DUMPS_PATH: &str = "./dumps";
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Debug, Clone)]
 pub struct TestSettings {
     /// Ethernet NIC, e.g. `enp2s0`.
     pub nic: String,
@@ -158,6 +158,9 @@ pub struct RunMetadata {
     /// Time for a packet to reach the end of the network and come back, according to EtherCAT's DC
     /// system.
     pub network_propagation_time_ns: u32,
+
+    /// Settings used for this run.
+    pub settings: TestSettings,
 }
 
 fn run(
@@ -232,6 +235,7 @@ fn run(
         cycle_metadata,
         network_propagation_time_ns,
         scenario: scenario_name,
+        settings: settings.clone(),
     })
 }
 
