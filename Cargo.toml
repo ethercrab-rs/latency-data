@@ -12,7 +12,8 @@ chrono = { version = "0.4.31", default-features = false, features = [
     "std",
 ] }
 clap = { version = "4.4.6", features = ["derive"] }
-dump-analyser = { git = "https://github.com/ethercrab-rs/dump-analyser.git", rev = "50717e7", version = "0.1.0" }
+# TODO: Use git dep
+dump-analyser = { path = "../dump-analyser/analyser", version = "0.1.0" }
 env_logger = "0.10.0"
 ethercrab = { version = "0.3.1", path = "../ethercrab" }
 futures-lite = "1.13.0"

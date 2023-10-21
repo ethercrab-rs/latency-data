@@ -4,8 +4,10 @@ use crate::{
 };
 use clap::Parser;
 use db::connect_and_init;
-use scenarios::RunMetadata;
-use sqlx::{query, types::Json};
+use dump_analyser::PcapFile;
+use ethercrab::{Command, Writes};
+use scenarios::{dump_path, RunMetadata};
+use sqlx::{query, types::Json, PgPool};
 use std::fs;
 use tokio::runtime::Runtime;
 
@@ -171,10 +173,81 @@ async fn ingest(
             .await?;
         }
 
-        // Process responses
+        // Skip all init packets by looking for a first LRW, which is a good canary for cyclic data
+        // start.
+        let reader = PcapFile::new(&dump_path(&result.name))
+            .skip_while(|packet| !matches!(packet.command, Command::Write(Writes::Lrw { .. })));
 
-        // Ingest responses
+        let cycle_packets = reader.collect::<Vec<_>>();
+        let first_packet = cycle_packets.first().expect("Empty dump");
+
+        // Make all TX/RX times relative to first unfiltered packet
+        let start_offset = first_packet.time;
+
+        // A vec to collect sent/received PDU pairs into a single item with metadata
+        let mut scratch = Vec::new();
+
+        for packet in cycle_packets {
+            // Newly sent PDU
+            if packet.from_master {
+                scratch.push(Packet {
+                    packet_number: packet.wireshark_packet_number as i32,
+                    index: packet.index as i16,
+                    tx_time_ns: (packet.time - start_offset).as_nanos() as i32,
+                    rx_time_ns: 0,
+                    delta_time_ns: 0,
+                    command: packet.command.to_string(),
+                });
+            }
+            // Response to existing sent PDU
+            else {
+                // Find last sent PDU with this receive PDU's same index
+                let sent = scratch
+                    .iter_mut()
+                    .rev()
+                    .find(|stat| stat.index == packet.index as i16)
+                    .expect("Could not find sent packet");
+
+                sent.rx_time_ns = (packet.time - start_offset).as_nanos() as i32;
+                sent.delta_time_ns = sent.rx_time_ns - sent.tx_time_ns;
+            }
+        }
+
+        for packet in scratch {
+            packet.insert(&result.name, &db).await?;
+        }
     }
 
     Ok(())
+}
+
+struct Packet {
+    packet_number: i32,
+    index: i16,
+    command: String,
+    tx_time_ns: i32,
+    rx_time_ns: i32,
+    delta_time_ns: i32,
+}
+
+impl Packet {
+    async fn insert(self, run_name: &str, db: &PgPool) -> anyhow::Result<()> {
+        query(
+            r#"insert into frames
+                (run, packet_number, index, command, tx_time_ns, rx_time_ns, delta_time_ns)
+                values
+                ($1, $2, $3, $4, $5, $6, $7)"#,
+        )
+        .bind(run_name)
+        .bind(self.packet_number)
+        .bind(self.index)
+        .bind(self.command)
+        .bind(self.tx_time_ns)
+        .bind(self.rx_time_ns)
+        .bind(self.delta_time_ns)
+        .execute(db)
+        .await?;
+
+        Ok(())
+    }
 }

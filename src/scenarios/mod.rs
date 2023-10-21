@@ -168,19 +168,7 @@ fn run(
         date_slug
     );
 
-    let dump_filename = {
-        fs::create_dir_all(DUMPS_PATH).expect("Create dumps dir");
-
-        let mut path = PathBuf::from(DUMPS_PATH)
-            .canonicalize()
-            .expect("Create dumps path");
-
-        path.push(&name);
-
-        path.set_extension("pcapng");
-
-        path
-    };
+    let dump_filename = dump_path(&name);
 
     let start = Instant::now();
 
@@ -227,6 +215,21 @@ fn run(
         network_propagation_time_ns,
         scenario: scenario_name,
     })
+}
+
+/// Create a full canonicalised file path from a run name.
+pub fn dump_path(name: &str) -> PathBuf {
+    fs::create_dir_all(DUMPS_PATH).expect("Create dumps dir");
+
+    let mut path = PathBuf::from(DUMPS_PATH)
+        .canonicalize()
+        .expect("Create dumps path");
+
+    path.push(name);
+
+    path.set_extension("pcapng");
+
+    path
 }
 
 /// Run all scenarios sequentially while capturing network traffic in the background with `tshark`
