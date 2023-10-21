@@ -204,7 +204,7 @@ async fn ingest(
                 scratch.push(Packet {
                     packet_number: packet.wireshark_packet_number as i32,
                     index: packet.index as i16,
-                    tx_time_ns: (packet.time - start_offset).as_nanos() as i32,
+                    tx_time_ns: (packet.time - start_offset).as_nanos() as i64,
                     rx_time_ns: 0,
                     delta_time_ns: 0,
                     command: packet.command.to_string(),
@@ -219,8 +219,8 @@ async fn ingest(
                     .find(|stat| stat.index == packet.index as i16)
                     .expect("Could not find sent packet");
 
-                sent.rx_time_ns = (packet.time - start_offset).as_nanos() as i32;
-                sent.delta_time_ns = sent.rx_time_ns - sent.tx_time_ns;
+                sent.rx_time_ns = (packet.time - start_offset).as_nanos() as i64;
+                sent.delta_time_ns = (sent.rx_time_ns - sent.tx_time_ns) as i32;
             }
         }
 
@@ -247,11 +247,12 @@ async fn ingest(
     Ok(())
 }
 
+/// Database representation of a TX/RX cycle.
 struct Packet {
     packet_number: i32,
     index: i16,
     command: String,
-    tx_time_ns: i32,
-    rx_time_ns: i32,
+    tx_time_ns: i64,
+    rx_time_ns: i64,
     delta_time_ns: i32,
 }

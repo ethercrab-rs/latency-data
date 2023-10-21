@@ -6,8 +6,8 @@ create table if not exists "frames" (
   -- ethercat pdu index
   "index" smallint not null,
   "command" character varying(32)  not null,
-  "tx_time_ns" integer not null,
-  "rx_time_ns" integer not null,
+  "tx_time_ns" bigint not null,
+  "rx_time_ns" bigint not null,
   "delta_time_ns" integer not null,
   primary key ("id")
 );
