@@ -132,6 +132,9 @@ pub struct CycleMetadata {
     ///
     /// Should be close or equal to configured cycle time.
     pub cycle_time_delta_ns: u32,
+
+    /// Cycle number, starting from zero.
+    pub cycle: usize,
 }
 
 #[derive(Debug, Clone)]

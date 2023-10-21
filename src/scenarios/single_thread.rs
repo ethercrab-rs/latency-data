@@ -41,7 +41,7 @@ pub fn single_thread(
         let iterations = 5000usize;
         let mut cycles = Vec::with_capacity(iterations);
 
-        for _ in 0..iterations {
+        for cycle in 0..iterations {
             let loop_start = Instant::now();
 
             loop_tick(&mut group, &client).await;
@@ -55,6 +55,7 @@ pub fn single_thread(
             let cycle_time_delta_ns = prev.elapsed().as_nanos();
 
             cycles.push(CycleMetadata {
+                cycle,
                 processing_time_ns: processing_time_ns as u32,
                 tick_wait_ns: tick_wait_ns as u32,
                 cycle_time_delta_ns: cycle_time_delta_ns as u32,

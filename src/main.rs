@@ -166,8 +166,6 @@ async fn ingest(
         .execute(&db)
         .await?;
 
-        let mut counter = 0;
-
         // Insert every cycle iteration stat
         for chunk in result.cycle_metadata.chunks(5000) {
             QueryBuilder::new(
@@ -176,12 +174,10 @@ async fn ingest(
             )
             .push_values(chunk.iter(), |mut b, cycle| {
                 b.push_bind(&result.name)
-                    .push_bind(counter as i32)
+                    .push_bind(cycle.cycle as i32)
                     .push_bind(cycle.processing_time_ns as i32)
                     .push_bind(cycle.tick_wait_ns as i32)
                     .push_bind(cycle.cycle_time_delta_ns as i32);
-
-                counter += 1;
             })
             .build()
             .execute(&db)
