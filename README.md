@@ -147,11 +147,11 @@ IOs?
 If only one task is used, use main thread. If more than one task, spawn in background and main
 thread only joins them.
 
-- 1 thread (tx/rx runs on this thread too), 1 group task in main loop
-- 1 thread, 10 group tasks
-- 2 threads, 1 group task, tx/rx runs in background thread
-- 2 threads, 10 group tasks, tx/rx runs in background thread
-- 11 threads, main thread just joins them all
+- [x] 1 thread (tx/rx runs on this thread too), 1 group task in main loop
+- [ ] 1 thread, 10 group tasks
+- [ ] 2 threads, 1 group task, tx/rx runs in background thread
+- [ ] 2 threads, 10 group tasks, tx/rx runs in background thread
+- [ ] 11 threads, main thread just joins them all
 
 ## Cycle times
 
