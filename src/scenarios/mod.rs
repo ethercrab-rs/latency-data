@@ -266,7 +266,7 @@ pub fn run_all(
         &dyn Fn(&TestSettings) -> Result<(Vec<CycleMetadata>, u32), ethercrab::error::Error>,
         &'static str,
     )> = vec![
-        (&single_thread, "1thr"),
+        (&single_thread, "1thr-1task"),
         (&single_thread_2_tasks, "1thr-2task"),
         (&single_thread_10_tasks, "1thr-10task"),
     ];
