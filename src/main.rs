@@ -7,7 +7,7 @@ use db::connect_and_init;
 use dump_analyser::PcapFile;
 use ethercrab::{Command, Writes};
 use scenarios::{dump_path, RunMetadata};
-use sqlx::{query, types::Json, PgPool};
+use sqlx::{query, types::Json, QueryBuilder};
 use std::fs;
 use tokio::runtime::Runtime;
 
@@ -157,21 +157,23 @@ async fn ingest(
         .await?;
 
         // Insert every cycle iteration stat
-        for (counter, cycle) in result.cycle_metadata.iter().enumerate() {
-            query(
-                r#"insert into cycles
-                (run, cycle, processing_time_ns, tick_wait_ns, cycle_time_delta_ns)
-                values
-                ($1, $2, $3, $4, $5)"#,
-            )
-            .bind(&result.name)
-            .bind(counter as i32)
-            .bind(cycle.processing_time_ns as i32)
-            .bind(cycle.tick_wait_ns as i32)
-            .bind(cycle.cycle_time_delta_ns as i32)
-            .execute(&db)
-            .await?;
-        }
+        QueryBuilder::new(
+            r#"insert into cycles
+            (run, cycle, processing_time_ns, tick_wait_ns, cycle_time_delta_ns) "#,
+        )
+        .push_values(
+            result.cycle_metadata.iter().enumerate(),
+            |mut b, (counter, cycle)| {
+                b.push_bind(&result.name)
+                    .push_bind(counter as i32)
+                    .push_bind(cycle.processing_time_ns as i32)
+                    .push_bind(cycle.tick_wait_ns as i32)
+                    .push_bind(cycle.cycle_time_delta_ns as i32);
+            },
+        )
+        .build()
+        .execute(&db)
+        .await?;
 
         // Skip all init packets by looking for a first LRW, which is a good canary for cyclic data
         // start.
@@ -213,9 +215,22 @@ async fn ingest(
             }
         }
 
-        for packet in scratch {
-            packet.insert(&result.name, &db).await?;
-        }
+        QueryBuilder::new(
+            r#"insert into frames
+            (run, packet_number, index, command, tx_time_ns, rx_time_ns, delta_time_ns) "#,
+        )
+        .push_values(scratch, |mut b, packet| {
+            b.push_bind(&result.name)
+                .push_bind(packet.packet_number)
+                .push_bind(packet.index)
+                .push_bind(packet.command)
+                .push_bind(packet.tx_time_ns)
+                .push_bind(packet.rx_time_ns)
+                .push_bind(packet.delta_time_ns);
+        })
+        .build()
+        .execute(&db)
+        .await?;
     }
 
     Ok(())
@@ -228,26 +243,4 @@ struct Packet {
     tx_time_ns: i32,
     rx_time_ns: i32,
     delta_time_ns: i32,
-}
-
-impl Packet {
-    async fn insert(self, run_name: &str, db: &PgPool) -> anyhow::Result<()> {
-        query(
-            r#"insert into frames
-                (run, packet_number, index, command, tx_time_ns, rx_time_ns, delta_time_ns)
-                values
-                ($1, $2, $3, $4, $5, $6, $7)"#,
-        )
-        .bind(run_name)
-        .bind(self.packet_number)
-        .bind(self.index)
-        .bind(self.command)
-        .bind(self.tx_time_ns)
-        .bind(self.rx_time_ns)
-        .bind(self.delta_time_ns)
-        .execute(db)
-        .await?;
-
-        Ok(())
-    }
 }
