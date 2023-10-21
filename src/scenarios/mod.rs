@@ -206,7 +206,7 @@ fn run(
     };
 
     // Let tshark settle in. It might miss packets if this delay is not here.
-    std::thread::sleep(Duration::from_millis(200));
+    std::thread::sleep(Duration::from_millis(500));
 
     log::info!(
         "Running scenario {}, saving to {}",
@@ -216,12 +216,12 @@ fn run(
 
     let (cycle_metadata, network_propagation_time_ns) = scenario(settings)?;
 
-    std::thread::sleep(Duration::from_millis(100));
+    std::thread::sleep(Duration::from_millis(500));
 
     // Stop tshark
     tshark.kill().expect("Failed to kill tshark");
 
-    std::thread::sleep(Duration::from_millis(100));
+    std::thread::sleep(Duration::from_millis(500));
 
     log::info!(
         "--> Collected {} process cycles in {} ms, network propagation time {} ns",

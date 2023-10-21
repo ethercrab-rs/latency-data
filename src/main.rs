@@ -167,6 +167,12 @@ async fn ingest(db: &str, clean: bool, results: Vec<(&str, RunMetadata)>) -> any
     }
 
     for (scenario_name, result) in results {
+        log::info!(
+            "Ingesting data for scenario {}, run {}",
+            scenario_name,
+            result.name
+        );
+
         // Insert a record into `runs`
         query(
             r#"insert into runs
@@ -201,10 +207,13 @@ async fn ingest(db: &str, clean: bool, results: Vec<(&str, RunMetadata)>) -> any
             .await?;
         }
 
+        log::info!("--> Cycles done");
+
         // Skip all init packets by looking for a first LRW, which is a good canary for cyclic data
         // start.
-        let reader = PcapFile::new(&dump_path(&result.name))
-            .skip_while(|packet| !matches!(packet.command, Command::Write(Writes::Lrw { .. })));
+        let reader = PcapFile::new(&dump_path(&result.name)).skip_while(|packet| {
+            !matches!(packet.command, Command::Write(Writes::Lrw { .. })) && !packet.from_master
+        });
 
         let cycle_packets = reader.collect::<Vec<_>>();
         let first_packet = cycle_packets.first().expect("Empty dump");
@@ -229,12 +238,17 @@ async fn ingest(db: &str, clean: bool, results: Vec<(&str, RunMetadata)>) -> any
             }
             // Response to existing sent PDU
             else {
+                let len = scratch.len();
+
                 // Find last sent PDU with this receive PDU's same index
                 let sent = scratch
                     .iter_mut()
                     .rev()
                     .find(|stat| stat.index == packet.index as i16)
-                    .expect(&format!("Could not find sent packet {}", packet.index));
+                    .expect(&format!(
+                        "Could not find sent packet {} in {} prev packets",
+                        packet.index, len
+                    ));
 
                 sent.rx_time_ns = (packet.time - start_offset).as_nanos() as i64;
                 sent.delta_time_ns = (sent.rx_time_ns - sent.tx_time_ns) as i32;
@@ -259,6 +273,8 @@ async fn ingest(db: &str, clean: bool, results: Vec<(&str, RunMetadata)>) -> any
             .execute(&db)
             .await?;
         }
+
+        log::info!("--> Frames done");
     }
 
     Ok(())

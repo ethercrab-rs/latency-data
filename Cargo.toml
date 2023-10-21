@@ -16,6 +16,7 @@ clap = { version = "4.4.6", features = ["derive"] }
 dump-analyser = { path = "../dump-analyser/analyser", version = "0.1.0" }
 env_logger = "0.10.0"
 ethercrab = { version = "0.3.1", path = "../ethercrab" }
+futures = { version = "0.3.28", default-features = false }
 futures-lite = "1.13.0"
 log = "0.4.20"
 serde = { version = "1.0.189", features = ["derive"] }
