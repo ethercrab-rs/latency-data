@@ -283,8 +283,13 @@ pub fn run_all(
                 } else {
                     None
                 }
-            } else {
-                None
+            }
+            // No filtering - run everything
+            else {
+                Some(
+                    run(settings, scenario_fn, &scenario_name)
+                        .map(|result| (scenario_name, result)),
+                )
             }
         })
         .collect::<Result<Vec<_>, _>>()
