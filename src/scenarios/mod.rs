@@ -226,7 +226,7 @@ fn run(
     // Stop tshark
     tshark.kill().expect("Failed to kill tshark");
 
-    std::thread::sleep(Duration::from_millis(100));
+    std::thread::sleep(Duration::from_millis(500));
 
     log::info!(
         "--> Collected {} process cycles in {} ms, network propagation time {} ns",
