@@ -87,7 +87,14 @@ fn create_client<'sto>(
 
     let client = Client::new(
         pdu_loop,
-        Timeouts::default(),
+        Timeouts {
+            pdu: Duration::from_millis(1000),
+            state_transition: Duration::from_millis(5000),
+            eeprom: Duration::from_millis(1000),
+            mailbox_echo: Duration::from_millis(1000),
+            mailbox_response: Duration::from_millis(1000),
+            ..Timeouts::default()
+        },
         ClientConfig {
             dc_static_sync_iterations: 1000,
             ..ClientConfig::default()
