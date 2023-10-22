@@ -54,10 +54,7 @@ fn inner(
             })
             .expect("TX/RX thread");
 
-        let mut groups = smol::block_on(create_groups(&client))?
-            .into_iter()
-            .take(num_tasks)
-            .collect::<Vec<_>>();
+        let mut groups = smol::block_on(create_groups(&client))?;
 
         // The time it takes to traverse to the end of the EtherCAT network and back again.
         let network_propagation_time_ns = groups
@@ -66,6 +63,8 @@ fn inner(
             .map(|device| device.propagation_delay())
             .max()
             .expect("Unable to compute prop time");
+
+        let groups = groups.into_iter().take(num_tasks).collect::<Vec<_>>();
 
         let handles = groups
             .into_iter()
@@ -76,13 +75,9 @@ fn inner(
                     .spawn_scoped_careless(s, move || {
                         let local_ex = smol::LocalExecutor::new();
 
-                        futures_lite::future::block_on(local_ex.run(async {
-                            let cycles = futures_lite::future::block_on(
-                                local_ex.run(task(group, &client, &settings)),
-                            );
-
-                            cycles
-                        }))
+                        futures_lite::future::block_on(
+                            local_ex.run(task(group, &client, &settings)),
+                        )
                     })
                     .unwrap()
             })
