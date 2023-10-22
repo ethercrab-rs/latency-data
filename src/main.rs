@@ -153,6 +153,8 @@ fn main() {
 
         for cycle_time_us in cycle_times.iter() {
             let settings = TestSettings {
+                tuned_adm_profile: tuned_adm_profile.clone(),
+                ethtool_settings: (tx_usecs, rx_usecs),
                 nic: interface.clone(),
                 is_rt,
                 net_prio,

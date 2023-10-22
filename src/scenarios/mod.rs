@@ -41,6 +41,9 @@ pub struct TestSettings {
     /// Whether we are running an RT kernel or not.
     pub is_rt: bool,
 
+    pub tuned_adm_profile: String,
+    pub ethtool_settings: (u32, u32),
+
     /// If RT is enabled, this is the priority to set for thread that handles network IO.
     pub net_prio: u8,
 
@@ -55,9 +58,12 @@ impl TestSettings {
     /// Get a hyphenated slug to insert into a filename, test name, etc.
     pub fn slug(&self) -> String {
         format!(
-            "{}-{}-n{}-t{}-{}us",
+            "{}-{}-tadm-{}-etht-{}-{}-n{}-t{}-{}us",
             self.nic,
             if self.is_rt { "rt" } else { "nort" },
+            self.tuned_adm_profile,
+            self.ethtool_settings.0,
+            self.ethtool_settings.1,
             self.net_prio,
             self.task_prio,
             self.cycle_time_us

@@ -135,7 +135,7 @@ sudo ./latency-data --interface enp2s0 --task-prio 48 --net-prio 49
 - RT kernel with tunedadm + prio
 - RT kernel with ethtool + tunedadm + prio
 
-`tunedadm` will be this: `sudo tuned-adm profile network-latency`
+`tunedadm` will be this: `sudo tuned-adm profile network-latency` (default is `balanced`)
 
 `ethtool` will be this: `sudo ethtool -C enp1s0f0 tx-usecs 0 rx-usecs 0`
 
