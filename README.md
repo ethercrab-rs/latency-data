@@ -200,3 +200,11 @@ Probably one, 2, 10 tasks.
 
 I don't have a 5 unfortunately, but either way it would be cool to see how good we can get the rPi
 for use in smaller setups.
+
+## Disable hyperthreading
+
+## Pin to a single core
+
+Need to make sure the kernel isn't using that core either.
+
+## Check `CONFIG_HZ`
