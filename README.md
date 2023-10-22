@@ -27,11 +27,11 @@ libc::socket(
 );
 ```
 
-Cross compiled from Windows 11 for `x86_64-unknown-linux-gnu`. Binary will be run as root.
+Binary will be run as root.
 
 Only other deliberate task will be `tshark`, started by the test binary.
 
-Each test will be run 3 times.
+Each test will be run multiple times.
 
 ## System setup
 
