@@ -16,10 +16,12 @@ use std::{
     time::{Duration, Instant},
 };
 use thread_priority::{ThreadBuilder, ThreadPriority, ThreadSchedulePolicy};
+use two_threads::two_threads;
 
 mod single_thread;
 mod single_thread_10_tasks;
 mod single_thread_2_tasks;
+mod two_threads;
 
 /// Maximum number of slaves that can be stored. This must be a power of 2 greater than 1.
 const MAX_SLAVES: usize = 16;
@@ -276,6 +278,7 @@ pub fn run_all(
         (&single_thread, "1thr-1task"),
         (&single_thread_2_tasks, "1thr-2task"),
         (&single_thread_10_tasks, "1thr-10task"),
+        (&two_threads, "2thr-1task"),
     ];
 
     scenarios
@@ -304,16 +307,16 @@ pub fn run_all(
 
 /// Create a thread builder using the `net` priority from [`TestSettings`].
 fn make_net_thread(settings: &TestSettings) -> ThreadBuilder {
-    make_thread(settings.is_rt, settings.net_prio)
+    make_thread(settings.is_rt, settings.net_prio, "ethercrab-net")
 }
 
 /// Create a thread builder using the `task` priority from [`TestSettings`].
 fn make_task_thread(settings: &TestSettings) -> ThreadBuilder {
-    make_thread(settings.is_rt, settings.task_prio)
+    make_thread(settings.is_rt, settings.task_prio, "ethercrab-task")
 }
 
-fn make_thread(is_rt: bool, prio: u8) -> ThreadBuilder {
-    let builder = ThreadBuilder::default();
+fn make_thread(is_rt: bool, prio: u8, name: &str) -> ThreadBuilder {
+    let builder = ThreadBuilder::default().name(name);
 
     // Magic value of 0 denotes no scheduling set
     let builder = if is_rt && prio > 0 {
