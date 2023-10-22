@@ -127,6 +127,7 @@ sudo ./latency-data --interface enp2s0 --task-prio 48 --net-prio 49
 
 - RT kernel no prio set
 - RT kernel with 48 task, 49 TX/RX thread prio (or 49 prio for main thread if only one is used)
+- RT kernel with 90 task, 91 TX/RX thread prio (or 91 prio for main thread if only one is used)
 - RT kernel with JUST ethtool
 - RT kernel with JUST tunedadm
 - RT kernel with ethtool + tunedadm

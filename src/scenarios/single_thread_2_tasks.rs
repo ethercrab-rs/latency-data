@@ -1,4 +1,6 @@
-use super::{create_client, create_groups, loop_tick, CycleMetadata, TestSettings};
+use super::{
+    create_client, create_groups, loop_tick, make_task_thread, CycleMetadata, TestSettings,
+};
 use ethercrab::{self, PduStorage};
 use futures_lite::StreamExt;
 use std::time::{Duration, Instant};
@@ -11,36 +13,47 @@ use std::time::{Duration, Instant};
 pub fn single_thread_2_tasks(
     settings: &TestSettings,
 ) -> Result<(Vec<CycleMetadata>, u32), ethercrab::error::Error> {
-    let storage = PduStorage::new();
+    std::thread::scope(|s| {
+        let builder = make_task_thread(settings);
 
-    let (client, tx_rx) = create_client(&settings.nic, &storage);
+        builder
+            .spawn_scoped(s, |_| {
+                let storage = PduStorage::new();
 
-    let local_ex = smol::LocalExecutor::new();
+                let (client, tx_rx) = create_client(&settings.nic, &storage);
 
-    local_ex.spawn(tx_rx).detach();
+                let local_ex = smol::LocalExecutor::new();
 
-    let mut groups = futures_lite::future::block_on(local_ex.run(create_groups(&client)))?;
+                local_ex.spawn(tx_rx).detach();
 
-    // The time it takes to traverse to the end of the EtherCAT network and back again.
-    let network_propagation_time_ns = groups
-        .iter_mut()
-        .flat_map(|group| group.iter(&client))
-        .map(|device| device.propagation_delay())
-        .max()
-        .expect("Unable to compute prop time");
+                let mut groups =
+                    futures_lite::future::block_on(local_ex.run(create_groups(&client)))?;
 
-    let [group1, group2, ..] = groups;
+                // The time it takes to traverse to the end of the EtherCAT network and back again.
+                let network_propagation_time_ns = groups
+                    .iter_mut()
+                    .flat_map(|group| group.iter(&client))
+                    .map(|device| device.propagation_delay())
+                    .max()
+                    .expect("Unable to compute prop time");
 
-    let f1 = local_ex.spawn(task(group1, &client, settings));
+                let [group1, group2, ..] = groups;
 
-    let f2 = local_ex.spawn(task(group2, &client, settings));
+                let f1 = local_ex.spawn(task(group1, &client, settings));
 
-    let (mut results1, mut results2) =
-        futures_lite::future::block_on(local_ex.run(futures_lite::future::zip(f1, f2)));
+                let f2 = local_ex.spawn(task(group2, &client, settings));
 
-    results1.append(&mut results2);
+                let (mut results1, mut results2) =
+                    futures_lite::future::block_on(local_ex.run(futures_lite::future::zip(f1, f2)));
 
-    Ok((results1, network_propagation_time_ns))
+                results1.append(&mut results2);
+
+                Ok((results1, network_propagation_time_ns))
+            })
+            .unwrap()
+            .join()
+            .unwrap()
+    })
 }
 
 async fn task(

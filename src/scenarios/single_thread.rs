@@ -1,4 +1,6 @@
-use super::{create_client, create_groups, loop_tick, CycleMetadata, TestSettings};
+use super::{
+    create_client, create_groups, loop_tick, make_task_thread, CycleMetadata, TestSettings,
+};
 use ethercrab::{self, PduStorage};
 use futures_lite::StreamExt;
 use std::time::{Duration, Instant};
@@ -11,59 +13,70 @@ use std::time::{Duration, Instant};
 pub fn single_thread(
     settings: &TestSettings,
 ) -> Result<(Vec<CycleMetadata>, u32), ethercrab::error::Error> {
-    let storage = PduStorage::new();
+    std::thread::scope(|s| {
+        let builder = make_task_thread(settings);
 
-    let (client, tx_rx) = create_client(&settings.nic, &storage);
+        builder
+            .spawn_scoped(s, |_| {
+                let storage = PduStorage::new();
 
-    let local_ex = smol::LocalExecutor::new();
+                let (client, tx_rx) = create_client(&settings.nic, &storage);
 
-    local_ex.spawn(tx_rx).detach();
+                let local_ex = smol::LocalExecutor::new();
 
-    futures_lite::future::block_on(local_ex.run(async move {
-        let mut groups = create_groups(&client).await?;
+                local_ex.spawn(tx_rx).detach();
 
-        // The time it takes to traverse to the end of the EtherCAT network and back again.
-        let network_propagation_time_ns = groups
-            .iter_mut()
-            .flat_map(|group| group.iter(&client))
-            .map(|device| device.propagation_delay())
-            .max()
-            .expect("Unable to compute prop time");
+                futures_lite::future::block_on(local_ex.run(async move {
+                    let mut groups = create_groups(&client).await?;
 
-        let [group, ..] = groups;
+                    // The time it takes to traverse to the end of the EtherCAT network and back again.
+                    let network_propagation_time_ns = groups
+                        .iter_mut()
+                        .flat_map(|group| group.iter(&client))
+                        .map(|device| device.propagation_delay())
+                        .max()
+                        .expect("Unable to compute prop time");
 
-        let mut group = group.into_op(&client).await.expect("PRE-OP -> OP");
+                    let [group, ..] = groups;
 
-        let mut tick = smol::Timer::interval(Duration::from_micros(settings.cycle_time_us.into()));
+                    let mut group = group.into_op(&client).await.expect("PRE-OP -> OP");
 
-        let mut prev = Instant::now();
+                    let mut tick =
+                        smol::Timer::interval(Duration::from_micros(settings.cycle_time_us.into()));
 
-        let iterations = 5000usize;
-        let mut cycles = Vec::with_capacity(iterations);
+                    let mut prev = Instant::now();
 
-        for cycle in 0..iterations {
-            let loop_start = Instant::now();
+                    let iterations = 5000usize;
+                    let mut cycles = Vec::with_capacity(iterations);
 
-            loop_tick(&mut group, &client).await;
+                    for cycle in 0..iterations {
+                        let loop_start = Instant::now();
 
-            let processing_time_ns = loop_start.elapsed().as_nanos();
+                        loop_tick(&mut group, &client).await;
 
-            tick.next().await;
+                        let processing_time_ns = loop_start.elapsed().as_nanos();
 
-            let tick_wait_ns = loop_start.elapsed().as_nanos() - processing_time_ns;
+                        tick.next().await;
 
-            let cycle_time_delta_ns = prev.elapsed().as_nanos();
+                        let tick_wait_ns = loop_start.elapsed().as_nanos() - processing_time_ns;
 
-            cycles.push(CycleMetadata {
-                cycle,
-                processing_time_ns: processing_time_ns as u32,
-                tick_wait_ns: tick_wait_ns as u32,
-                cycle_time_delta_ns: cycle_time_delta_ns as u32,
-            });
+                        let cycle_time_delta_ns = prev.elapsed().as_nanos();
 
-            prev = Instant::now();
-        }
+                        cycles.push(CycleMetadata {
+                            cycle,
+                            processing_time_ns: processing_time_ns as u32,
+                            tick_wait_ns: tick_wait_ns as u32,
+                            cycle_time_delta_ns: cycle_time_delta_ns as u32,
+                        });
 
-        Ok((cycles, network_propagation_time_ns))
-    }))
+                        prev = Instant::now();
+                    }
+
+                    Ok((cycles, network_propagation_time_ns))
+                }))
+            })
+            .unwrap()
+            .join()
+            .unwrap()
+    })
 }

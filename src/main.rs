@@ -23,16 +23,15 @@ pub struct Args {
     #[arg(long, short)]
     pub interface: String,
 
-    /// Sets the priority for tests that use a separate thread for TX/RX.
-    #[arg(long)]
-    pub net_prio: u32,
+    // /// Sets the priority for tests that use a separate thread for TX/RX.
+    // #[arg(long)]
+    // pub net_prio: u32,
 
-    /// Sets the priority for tests that use a separate thread for tasks.
-    ///
-    /// All tasks will be given the same priority.
-    #[arg(long)]
-    pub task_prio: u32,
-
+    // /// Sets the priority for tests that use a separate thread for tasks.
+    // ///
+    // /// All tasks will be given the same priority.
+    // #[arg(long)]
+    // pub task_prio: u32,
     /// Remove any previous dumps.
     #[arg(long)]
     pub clean: bool,
@@ -63,8 +62,8 @@ fn main() {
 
     let Args {
         interface,
-        net_prio,
-        task_prio,
+        // net_prio,
+        // task_prio,
         clean,
         db,
         clean_db,
@@ -95,56 +94,79 @@ fn main() {
     log::info!("- Realtime kernel: {}", if is_rt { "yes" } else { "no" });
     log::info!("- tuned-adm profile: {}", tuned_adm_profile);
     log::info!("- ethtool tx-usecs/rx-usecs: {}/{}", tx_usecs, rx_usecs);
-    log::info!(
-        "- Realtime priorities: net {}, task {}",
-        net_prio,
-        task_prio
-    );
+    // log::info!(
+    //     "- Realtime priorities: net {}, task {}",
+    //     net_prio,
+    //     task_prio
+    // );
 
-    if net_prio > 49 {
-        log::warn!("Net priority {} is at or above kernel priority", net_prio);
-    }
+    // if net_prio > 49 {
+    //     log::warn!("Net priority {} is at or above kernel priority", net_prio);
+    // }
 
-    if task_prio > 49 {
-        log::warn!("Task priority {} is at or above kernel priority", task_prio);
-    }
+    // if task_prio > 49 {
+    //     log::warn!("Task priority {} is at or above kernel priority", task_prio);
+    // }
 
-    if task_prio >= net_prio {
-        log::warn!(
-            "Task priority {} is at or above net priority {}. Ensure this is intentional",
-            task_prio,
-            net_prio
-        );
-    }
+    // if task_prio >= net_prio {
+    //     log::warn!(
+    //         "Task priority {} is at or above net priority {}. Ensure this is intentional",
+    //         task_prio,
+    //         net_prio
+    //     );
+    // }
 
     // ---
 
     let mut results = Vec::new();
 
-    let settings = TestSettings {
-        nic: interface.clone(),
-        is_rt,
-        net_prio,
-        task_prio,
-        hostname: hostname.clone(),
-        cycle_time_us: 1000,
+    // Priority combinations for SCHED_FIFO
+    let prios = if is_rt {
+        vec![
+            // Use defaults
+            (0, 0),
+            // Just below kernel prio (50)
+            (48, 49),
+            (49, 48),
+            // Get really mean
+            (90, 91),
+            (91, 90),
+        ]
+    } else {
+        // These won't be set if RT is disabled so we'll just default to 0,0 to run the suite once.
+        vec![(0, 0)]
     };
 
-    for _ in 0..repeat {
-        results.extend(run_all(&settings, &filter).expect("1000us runs failed"));
-    }
+    for (task_prio, net_prio) in prios {
+        if is_rt {
+            log::info!(
+                "Running with RT priorities task {}, net {}",
+                task_prio,
+                net_prio
+            );
+        }
 
-    let settings = TestSettings {
-        nic: interface,
-        is_rt,
-        net_prio,
-        task_prio,
-        hostname,
-        cycle_time_us: 100,
-    };
+        let settings = TestSettings {
+            nic: interface.clone(),
+            is_rt,
+            net_prio,
+            task_prio,
+            hostname: hostname.clone(),
+            cycle_time_us: 1000,
+        };
 
-    for _ in 0..repeat {
-        results.extend(run_all(&settings, &filter).expect("100us runs failed"));
+        for _ in 0..repeat {
+            results.extend(run_all(&settings, &filter).expect("1000us runs failed"));
+        }
+
+        let settings = TestSettings {
+            cycle_time_us: 100,
+            ..settings
+        };
+
+        for _ in 0..repeat {
+            results.extend(run_all(&settings, &filter).expect("100us runs failed"));
+        }
     }
 
     log::info!("All scenarios executed, ingesting results...");

@@ -15,6 +15,7 @@ use std::{
     process::Stdio,
     time::{Duration, Instant},
 };
+use thread_priority::{ThreadBuilder, ThreadPriority, ThreadSchedulePolicy};
 
 mod single_thread;
 mod single_thread_10_tasks;
@@ -41,10 +42,10 @@ pub struct TestSettings {
     pub is_rt: bool,
 
     /// If RT is enabled, this is the priority to set for thread that handles network IO.
-    pub net_prio: u32,
+    pub net_prio: u8,
 
     /// If RT is enabled, this is the priority to set for thread(s) that handle PDI tasks.
-    pub task_prio: u32,
+    pub task_prio: u8,
 
     /// Cycle time in microseconds.
     pub cycle_time_us: u32,
@@ -295,30 +296,31 @@ pub fn run_all(
         .collect::<Result<Vec<_>, _>>()
 }
 
-// TODO
-//  thread_priority::ThreadBuilder::default()
-//         .name("tx-rx-task")
-//         // Might need to set `<user> hard rtprio 99` and `<user> soft rtprio 99` in `/etc/security/limits.conf`
-//         // Check limits with `ulimit -Hr` or `ulimit -Sr`
-//         .priority(ThreadPriority::Crossplatform(
-//             ThreadPriorityValue::try_from(99u8).unwrap(),
-//         ))
-//         // NOTE: Requires a realtime kernel
-//         .policy(ThreadSchedulePolicy::Realtime(
-//             RealtimeThreadSchedulePolicy::Fifo,
-//         ))
-//         .spawn(move |_| {
-//             let mut set = CpuSet::new();
-//             set.set(0);
+/// Create a thread builder using the `net` priority from [`TestSettings`].
+fn make_net_thread(settings: &TestSettings) -> ThreadBuilder {
+    make_thread(settings.is_rt, settings.net_prio)
+}
 
-//             // Pin thread to 0th core
-//             rustix::process::sched_setaffinity(None, &set).expect("set affinity");
+/// Create a thread builder using the `task` priority from [`TestSettings`].
+fn make_task_thread(settings: &TestSettings) -> ThreadBuilder {
+    make_thread(settings.is_rt, settings.task_prio)
+}
 
-//             let ex = LocalExecutor::new();
+fn make_thread(is_rt: bool, prio: u8) -> ThreadBuilder {
+    let builder = ThreadBuilder::default();
 
-//             futures_lite::future::block_on(
-//                 ex.run(tx_rx_task(&interface, tx, rx).expect("spawn TX/RX task")),
-//             )
-//             .expect("TX/RX task exited");
-//         })
-//         .unwrap();
+    // Magic value of 0 denotes no scheduling set
+    let builder = if is_rt && prio > 0 {
+        builder
+            .policy(ThreadSchedulePolicy::Realtime(
+                thread_priority::RealtimeThreadSchedulePolicy::Fifo,
+            ))
+            .priority(ThreadPriority::Crossplatform(
+                prio.try_into().expect("Bad net thread prio"),
+            ))
+    } else {
+        builder
+    };
+
+    builder
+}
