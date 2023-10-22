@@ -4,17 +4,41 @@ use super::{
 };
 use ethercrab::{self, PduStorage};
 use futures_lite::{future, StreamExt};
-use std::time::{Duration, Instant};
+use std::{
+    sync::Arc,
+    thread::ScopedJoinHandle,
+    time::{Duration, Instant},
+};
 
-/// Two threads: one with the TX/RX task and another with a single group cycle.
-pub fn two_threads(
+pub fn two_threads_1_task(
     settings: &TestSettings,
+) -> Result<(Vec<CycleMetadata>, u32), ethercrab::error::Error> {
+    inner(settings, 1)
+}
+
+pub fn two_threads_2_tasks(
+    settings: &TestSettings,
+) -> Result<(Vec<CycleMetadata>, u32), ethercrab::error::Error> {
+    inner(settings, 2)
+}
+
+pub fn two_threads_10_tasks(
+    settings: &TestSettings,
+) -> Result<(Vec<CycleMetadata>, u32), ethercrab::error::Error> {
+    inner(settings, 10)
+}
+
+fn inner(
+    settings: &TestSettings,
+    num_tasks: usize,
 ) -> Result<(Vec<CycleMetadata>, u32), ethercrab::error::Error> {
     let storage = PduStorage::new();
 
     let (client, tx_rx) = create_client(&settings.nic, &storage);
 
     std::thread::scope(|s| {
+        let client = Arc::new(client);
+
         let (net_tx, net_rx) = smol::channel::bounded(1);
 
         make_net_thread(settings)
@@ -30,66 +54,86 @@ pub fn two_threads(
             })
             .expect("TX/RX thread");
 
-        let res = make_task_thread(settings)
-            .spawn_scoped(s, |_| {
-                let local_ex = smol::LocalExecutor::new();
+        let mut groups = smol::block_on(create_groups(&client))?
+            .into_iter()
+            .take(num_tasks)
+            .collect::<Vec<_>>();
 
-                futures_lite::future::block_on(local_ex.run(async move {
-                    let mut groups = create_groups(&client).await?;
+        // The time it takes to traverse to the end of the EtherCAT network and back again.
+        let network_propagation_time_ns = groups
+            .iter_mut()
+            .flat_map(|group| group.iter(&client))
+            .map(|device| device.propagation_delay())
+            .max()
+            .expect("Unable to compute prop time");
 
-                    // The time it takes to traverse to the end of the EtherCAT network and back again.
-                    let network_propagation_time_ns = groups
-                        .iter_mut()
-                        .flat_map(|group| group.iter(&client))
-                        .map(|device| device.propagation_delay())
-                        .max()
-                        .expect("Unable to compute prop time");
+        let handles = groups
+            .into_iter()
+            .map(|group| {
+                let client = client.clone();
 
-                    let [group, ..] = groups;
+                make_task_thread(settings)
+                    .spawn_scoped_careless(s, move || {
+                        let local_ex = smol::LocalExecutor::new();
 
-                    let mut group = group.into_op(&client).await.expect("PRE-OP -> OP");
+                        futures_lite::future::block_on(local_ex.run(async {
+                            let cycles = futures_lite::future::block_on(
+                                local_ex.run(task(group, &client, &settings)),
+                            );
 
-                    let mut tick =
-                        smol::Timer::interval(Duration::from_micros(settings.cycle_time_us.into()));
-
-                    let mut prev = Instant::now();
-
-                    let iterations = 5000usize;
-                    let mut cycles = Vec::with_capacity(iterations);
-
-                    for cycle in 0..iterations {
-                        let loop_start = Instant::now();
-
-                        loop_tick(&mut group, &client).await;
-
-                        let processing_time_ns = loop_start.elapsed().as_nanos();
-
-                        tick.next().await;
-
-                        let tick_wait_ns = loop_start.elapsed().as_nanos() - processing_time_ns;
-
-                        let cycle_time_delta_ns = prev.elapsed().as_nanos();
-
-                        cycles.push(CycleMetadata {
-                            cycle,
-                            processing_time_ns: processing_time_ns as u32,
-                            tick_wait_ns: tick_wait_ns as u32,
-                            cycle_time_delta_ns: cycle_time_delta_ns as u32,
-                        });
-
-                        prev = Instant::now();
-                    }
-
-                    Ok((cycles, network_propagation_time_ns))
-                }))
+                            cycles
+                        }))
+                    })
+                    .unwrap()
             })
-            .unwrap()
-            .join()
-            .unwrap();
+            .collect::<Vec<ScopedJoinHandle<'_, Vec<CycleMetadata>>>>();
+
+        let results = handles
+            .into_iter()
+            .flat_map(|handle| handle.join().unwrap().into_iter())
+            .collect::<Vec<CycleMetadata>>();
 
         // Stop net thread. Scoped thread hangs waiting on net task to join otherwise.
         net_tx.send_blocking(()).ok();
 
-        res
+        Ok((results, network_propagation_time_ns))
     })
+}
+
+async fn task(
+    group: ethercrab::SlaveGroup<1, 16>,
+    client: &ethercrab::Client<'_>,
+    settings: &TestSettings,
+) -> Vec<CycleMetadata> {
+    let mut group = group.into_op(client).await.expect("PRE-OP -> OP");
+    let mut tick = smol::Timer::interval(Duration::from_micros(settings.cycle_time_us.into()));
+    let mut prev = Instant::now();
+
+    let iterations = 5000usize;
+
+    let mut cycles = Vec::with_capacity(iterations);
+
+    for cycle in 0..iterations {
+        let loop_start = Instant::now();
+
+        loop_tick(&mut group, client).await;
+
+        let processing_time_ns = loop_start.elapsed().as_nanos();
+
+        tick.next().await;
+
+        let tick_wait_ns = loop_start.elapsed().as_nanos() - processing_time_ns;
+        let cycle_time_delta_ns = prev.elapsed().as_nanos();
+
+        cycles.push(CycleMetadata {
+            cycle,
+            processing_time_ns: processing_time_ns as u32,
+            tick_wait_ns: tick_wait_ns as u32,
+            cycle_time_delta_ns: cycle_time_delta_ns as u32,
+        });
+
+        prev = Instant::now();
+    }
+
+    cycles
 }
