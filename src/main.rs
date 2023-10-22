@@ -32,6 +32,10 @@ pub struct Args {
     // /// All tasks will be given the same priority.
     // #[arg(long)]
     // pub task_prio: u32,
+    /// Cycle times in microseconds. Defaults to 1000,100
+    #[arg(long)]
+    pub cycle_times: Vec<u32>,
+
     /// Remove any previous dumps.
     #[arg(long)]
     pub clean: bool,
@@ -64,6 +68,7 @@ fn main() {
         interface,
         // net_prio,
         // task_prio,
+        cycle_times,
         clean,
         db,
         clean_db,
@@ -146,26 +151,19 @@ fn main() {
             );
         }
 
-        let settings = TestSettings {
-            nic: interface.clone(),
-            is_rt,
-            net_prio,
-            task_prio,
-            hostname: hostname.clone(),
-            cycle_time_us: 1000,
-        };
+        for cycle_time_us in cycle_times.iter() {
+            let settings = TestSettings {
+                nic: interface.clone(),
+                is_rt,
+                net_prio,
+                task_prio,
+                hostname: hostname.clone(),
+                cycle_time_us: *cycle_time_us,
+            };
 
-        for _ in 0..repeat {
-            results.extend(run_all(&settings, &filter).expect("1000us runs failed"));
-        }
-
-        let settings = TestSettings {
-            cycle_time_us: 100,
-            ..settings
-        };
-
-        for _ in 0..repeat {
-            results.extend(run_all(&settings, &filter).expect("100us runs failed"));
+            for _ in 0..repeat {
+                results.extend(run_all(&settings, &filter).expect("runs failed"));
+            }
         }
     }
 
