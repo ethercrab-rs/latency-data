@@ -9,7 +9,7 @@ mod two_threads_10_tasks;
 use chrono::{DateTime, Utc};
 use ethercrab::{
     slave_group::{Op, PreOp},
-    Client, ClientConfig, PduStorage, SlaveGroup, Timeouts,
+    Client, ClientConfig, PduStorage, RetryBehaviour, SlaveGroup, Timeouts,
 };
 use single_thread::single_thread;
 use single_thread_10_tasks::single_thread_10_tasks;
@@ -99,6 +99,7 @@ fn create_client<'sto>(
         },
         ClientConfig {
             dc_static_sync_iterations: 1000,
+            retry_behaviour: RetryBehaviour::Count(2),
             ..ClientConfig::default()
         },
     );
