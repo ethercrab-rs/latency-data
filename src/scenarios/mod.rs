@@ -3,7 +3,8 @@
 mod single_thread;
 mod single_thread_10_tasks;
 mod single_thread_2_tasks;
-mod two_threads;
+mod thread_per_task;
+mod two_threads_10_tasks;
 
 use chrono::{DateTime, Utc};
 use ethercrab::{
@@ -20,10 +21,11 @@ use std::{
     process::Stdio,
     time::{Duration, Instant},
 };
+use thread_per_task::eleven_threads;
+use thread_per_task::three_threads;
+use thread_per_task::two_threads;
 use thread_priority::{ThreadBuilder, ThreadPriority, ThreadSchedulePolicy};
-use two_threads::two_threads_10_tasks;
-use two_threads::two_threads_1_task;
-use two_threads::two_threads_2_tasks;
+use two_threads_10_tasks::two_threads_10_tasks;
 
 /// Maximum number of slaves that can be stored. This must be a power of 2 greater than 1.
 const MAX_SLAVES: usize = 16;
@@ -287,8 +289,9 @@ pub fn run_all(
         (&single_thread, "1thr-1task"),
         (&single_thread_2_tasks, "1thr-2task"),
         (&single_thread_10_tasks, "1thr-10task"),
-        (&two_threads_1_task, "2thr-1task"),
-        (&two_threads_2_tasks, "2thr-2task"),
+        (&two_threads, "2thr-1task"),
+        (&three_threads, "3thr-2task"),
+        (&eleven_threads, "11thr-10task"),
         (&two_threads_10_tasks, "2thr-10task"),
     ];
 

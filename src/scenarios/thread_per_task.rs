@@ -10,19 +10,22 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub fn two_threads_1_task(
+// Start 1 tx/rx thread and 1 task thread.
+pub fn two_threads(
     settings: &TestSettings,
 ) -> Result<(Vec<CycleMetadata>, u32), ethercrab::error::Error> {
     inner(settings, 1)
 }
 
-pub fn two_threads_2_tasks(
+// Start 1 tx/rx thread and 2 task threads.
+pub fn three_threads(
     settings: &TestSettings,
 ) -> Result<(Vec<CycleMetadata>, u32), ethercrab::error::Error> {
     inner(settings, 2)
 }
 
-pub fn two_threads_10_tasks(
+// Start 1 tx/rx thread and 10 task threads.
+pub fn eleven_threads(
     settings: &TestSettings,
 ) -> Result<(Vec<CycleMetadata>, u32), ethercrab::error::Error> {
     inner(settings, 10)
