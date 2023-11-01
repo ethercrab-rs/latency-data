@@ -23,6 +23,8 @@ create table if not exists "runs" (
   "scenario" character varying(128) not null,
   -- Run name, the long one
   "name" character varying(128) not null,
+  -- Run "category", like name field with no date
+  "slug" character varying(128) not null,
   -- PC hostname
   "hostname" character varying(128) not null,
   -- EtherCAT network time

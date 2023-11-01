@@ -198,13 +198,14 @@ async fn ingest(db: &str, clean: bool, results: Vec<(&str, RunMetadata)>) -> any
         // Insert a record into `runs`
         query(
             r#"insert into runs
-            (date, scenario, name, hostname, propagation_time_ns, settings)
+            (date, scenario, name, slug, hostname, propagation_time_ns, settings)
             values
-            ($1, $2, $3, $4, $5, $6)"#,
+            ($1, $2, $3, $4, $5, $6, $7)"#,
         )
         .bind(result.date)
         .bind(scenario_name)
         .bind(&result.name)
+        .bind(&result.slug)
         .bind(result.hostname)
         .bind(result.network_propagation_time_ns as i32)
         .bind(&Json(result.settings))

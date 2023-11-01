@@ -169,6 +169,9 @@ pub struct RunMetadata {
     /// Run name.
     pub name: String,
 
+    /// Run category (`name` field without timestamp).
+    pub slug: String,
+
     /// Metadata: computer hostname to use as an identifier.
     pub hostname: String,
 
@@ -196,13 +199,14 @@ fn run(
 
     let date_slug = now.timestamp();
 
-    let name = format!(
-        "{}-{}-{}-{}",
+    let slug = format!(
+        "{}-{}-{}",
         scenario_name,
         settings.hostname,
         settings.slug(),
-        date_slug
     );
+
+    let name = format!("{}-{}", slug, date_slug);
 
     let dump_filename = dump_path(&name);
 
@@ -252,6 +256,7 @@ fn run(
         date: now,
         hostname: settings.hostname.clone(),
         name,
+        slug,
         cycle_metadata,
         network_propagation_time_ns,
         scenario: scenario_name,
