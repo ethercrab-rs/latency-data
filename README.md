@@ -105,8 +105,9 @@ LRW would be quite interesting.
 During development, use `just`:
 
 ```bash
-# --clean will remove any existing capture files
-just run --interface enp2s0 --task-prio 48 --net-prio 49 --clean
+# --clean will remove any existing capture files, useful for ingesting new runs
+# --clean-db will empty the database too
+just run --interface enp2s0 --clean --clean-db --repeat 1 --cycle-times 1000 --filter 11thr-10task
 ```
 
 On a target machine, we need do the setcap dance OR run the thing as root
@@ -115,7 +116,7 @@ On a target machine, we need do the setcap dance OR run the thing as root
 # Optional
 sudo setcap cap_net_raw=pe ./latency-data
 
-sudo ./latency-data --interface enp2s0 --task-prio 48 --net-prio 49
+sudo ./latency-data --interface enp2s0 --clean --clean-db --repeat 1 --cycle-times 1000 --filter 11thr-10task
 ```
 
 ## Scenarios
@@ -151,8 +152,9 @@ thread only joins them.
 - [x] 1 thread (tx/rx runs on this thread too), 1 group task in main loop
 - [x] 1 thread, 10 group tasks
 - [x] 2 threads, 1 group task, tx/rx runs in background thread
-- [ ] 2 threads, 10 group tasks, tx/rx runs in background thread
-- [ ] 11 threads, main thread just joins them all
+- [x] 3 threads, 2 group tasks, tx/rx runs in background thread
+- [x] 2 threads, 10 group tasks, tx/rx runs in background thread
+- [x] 11 threads, main thread just joins them all
 
 ## Cycle times
 
