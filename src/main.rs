@@ -58,6 +58,10 @@ pub struct Args {
     /// Filter scenarios to those containing this string.
     #[arg(long)]
     pub filter: Option<String>,
+
+    /// Disable recording and ingesting of wireshark captures.
+    #[arg(long, default_value_t = false)]
+    pub no_capture: bool,
 }
 
 fn main() {
@@ -74,6 +78,7 @@ fn main() {
         clean_db,
         repeat,
         filter,
+        no_capture,
     } = Args::parse();
 
     if clean {
@@ -164,20 +169,22 @@ fn main() {
             };
 
             for _ in 0..repeat {
-                results.extend(run_all(&settings, &filter).expect("runs failed"));
+                results.extend(run_all(&settings, &filter, no_capture).expect("runs failed"));
             }
         }
     }
 
-    log::info!("All scenarios executed, ingesting results...");
+    if !no_capture {
+        log::info!("All scenarios executed, ingesting results...");
 
-    let rt = Runtime::new().unwrap();
-    let handle = rt.handle();
+        let rt = Runtime::new().unwrap();
+        let handle = rt.handle();
 
-    // Execute the future, blocking the current thread until completion
-    handle
-        .block_on(ingest(&db, clean_db, results))
-        .expect("Ingest failed");
+        // Execute the future, blocking the current thread until completion
+        handle
+            .block_on(ingest(&db, clean_db, results))
+            .expect("Ingest failed");
+    }
 }
 
 async fn ingest(db: &str, clean: bool, results: Vec<(&str, RunMetadata)>) -> anyhow::Result<()> {

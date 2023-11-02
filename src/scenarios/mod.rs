@@ -193,6 +193,7 @@ fn run(
     settings: &TestSettings,
     scenario: impl Fn(&TestSettings) -> Result<(Vec<CycleMetadata>, u32), ethercrab::error::Error>,
     scenario_name: &str,
+    no_capture: bool,
 ) -> Result<RunMetadata, ethercrab::error::Error> {
     let scenario_name = scenario_name.replace('_', "-");
 
@@ -213,7 +214,7 @@ fn run(
 
     let start = Instant::now();
 
-    let mut tshark = {
+    let tshark = if !no_capture {
         let mut cmd = std::process::Command::new("tshark");
 
         cmd.stdout(Stdio::null()).stderr(Stdio::null()).args(&[
@@ -227,22 +228,30 @@ fn run(
 
         log::debug!("Running capture command {:?}", cmd);
 
-        cmd.spawn().expect("Could not spawn tshark command")
+        let res = Some(cmd.spawn().expect("Could not spawn tshark command"));
+
+        // Let tshark settle in. It might miss packets if this delay is not here.
+        std::thread::sleep(Duration::from_millis(300));
+
+        log::info!(
+            "Running scenario {}, saving to {}",
+            scenario_name,
+            dump_filename.display()
+        );
+
+        res
+    } else {
+        log::info!("Running scenario {}, not capturing packets", scenario_name);
+
+        None
     };
-
-    // Let tshark settle in. It might miss packets if this delay is not here.
-    std::thread::sleep(Duration::from_millis(300));
-
-    log::info!(
-        "Running scenario {}, saving to {}",
-        scenario_name,
-        dump_filename.display()
-    );
 
     let (cycle_metadata, network_propagation_time_ns) = scenario(settings)?;
 
     // Stop tshark
-    tshark.kill().expect("Failed to kill tshark");
+    if let Some(mut tshark) = tshark {
+        tshark.kill().expect("Failed to kill tshark");
+    }
 
     std::thread::sleep(Duration::from_millis(500));
 
@@ -287,6 +296,7 @@ pub fn dump_path(name: &str) -> PathBuf {
 pub fn run_all(
     settings: &TestSettings,
     filter: &Option<String>,
+    no_capture: bool,
 ) -> Result<Vec<(&'static str, RunMetadata)>, ethercrab::error::Error> {
     let scenarios: Vec<(
         &dyn Fn(&TestSettings) -> Result<(Vec<CycleMetadata>, u32), ethercrab::error::Error>,
@@ -307,7 +317,7 @@ pub fn run_all(
             if let Some(filter) = filter {
                 if scenario_name.contains(filter) {
                     Some(
-                        run(settings, scenario_fn, &scenario_name)
+                        run(settings, scenario_fn, &scenario_name, no_capture)
                             .map(|result| (scenario_name, result)),
                     )
                 } else {
@@ -317,7 +327,7 @@ pub fn run_all(
             // No filtering - run everything
             else {
                 Some(
-                    run(settings, scenario_fn, &scenario_name)
+                    run(settings, scenario_fn, &scenario_name, no_capture)
                         .map(|result| (scenario_name, result)),
                 )
             }
