@@ -49,7 +49,7 @@ fn inner(
                 let local_ex = smol::LocalExecutor::new();
 
                 futures_lite::future::block_on(local_ex.run(future::or(tx_rx, async {
-                    net_rx.recv().await.unwrap();
+                    net_rx.recv().await.ok();
 
                     Ok(())
                 })))
