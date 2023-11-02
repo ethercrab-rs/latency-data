@@ -231,7 +231,7 @@ fn run(
     };
 
     // Let tshark settle in. It might miss packets if this delay is not here.
-    std::thread::sleep(Duration::from_millis(100));
+    std::thread::sleep(Duration::from_millis(300));
 
     log::info!(
         "Running scenario {}, saving to {}",
