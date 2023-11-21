@@ -210,3 +210,7 @@ for use in smaller setups.
 Need to make sure the kernel isn't using that core either.
 
 ## Check `CONFIG_HZ`
+
+## USB ethernet adapter
+
+USB3. Would like to check USB-C but I don't have one.
