@@ -3,7 +3,9 @@
 mod single_thread;
 mod single_thread_10_tasks;
 mod single_thread_2_tasks;
+mod smol;
 mod thread_per_task;
+mod tokio;
 mod two_threads_10_tasks;
 
 use chrono::{DateTime, Utc};
@@ -14,6 +16,7 @@ use ethercrab::{
 use single_thread::single_thread;
 use single_thread_10_tasks::single_thread_10_tasks;
 use single_thread_2_tasks::single_thread_2_tasks;
+use smol::smol_default;
 use std::{
     fs,
     future::Future,
@@ -25,6 +28,7 @@ use thread_per_task::eleven_threads;
 use thread_per_task::three_threads;
 use thread_per_task::two_threads;
 use thread_priority::{ThreadBuilder, ThreadPriority, ThreadSchedulePolicy};
+use tokio::tokio_default;
 use two_threads_10_tasks::two_threads_10_tasks;
 
 /// Maximum number of slaves that can be stored. This must be a power of 2 greater than 1.
@@ -302,6 +306,8 @@ pub fn run_all(
         &dyn Fn(&TestSettings) -> Result<(Vec<CycleMetadata>, u32), ethercrab::error::Error>,
         &'static str,
     )> = vec![
+        (&tokio_default, "tokio-default"),
+        (&smol_default, "smol-default"),
         (&single_thread, "1thr-1task"),
         (&single_thread_2_tasks, "1thr-2task"),
         (&single_thread_10_tasks, "1thr-10task"),
