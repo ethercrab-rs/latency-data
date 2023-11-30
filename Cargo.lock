@@ -795,7 +795,7 @@ dependencies = [
 
 [[package]]
 name = "ethercrab"
-version = "0.3.1"
+version = "0.3.4"
 dependencies = [
  "async-io 2.1.0",
  "atomic-waker",
@@ -809,15 +809,14 @@ dependencies = [
  "heapless",
  "libc",
  "log",
+ "nix",
  "nom",
  "num_enum",
  "packed_struct",
  "pnet_datalink",
- "rustix 0.38.21",
  "sealed",
  "smlang",
  "smoltcp",
- "thread-priority",
  "tokio",
 ]
 
@@ -1364,6 +1363,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f665ee40bc4a3c5590afb1e9677db74a508659dfd71e126420da8274909a0167"
 
 [[package]]
+name = "memoffset"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a634b1c61a95585bd15607c6ab0c4e5b226e695ff2800ba0cdccddf208c406c"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "minimal-lexical"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1403,6 +1411,18 @@ name = "nb"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d5439c4ad607c3c23abf66de8c8bf57ba8adcd1f129e699851a6e43935d339d"
+
+[[package]]
+name = "nix"
+version = "0.27.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2eb04e9c688eff1c89d72b407f168cf79bb9e867a9d3323ed6c01519eb9cc053"
+dependencies = [
+ "bitflags 2.4.1",
+ "cfg-if",
+ "libc",
+ "memoffset",
+]
 
 [[package]]
 name = "no-std-net"
