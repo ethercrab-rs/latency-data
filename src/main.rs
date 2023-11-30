@@ -33,7 +33,7 @@ pub struct Args {
     // #[arg(long)]
     // pub task_prio: u32,
     /// Cycle times in microseconds. Defaults to 1000,100
-    #[arg(long)]
+    #[arg(long, default_values_t = vec![1000, 100])]
     pub cycle_times: Vec<u32>,
 
     /// Remove any previous dumps.
@@ -62,6 +62,10 @@ pub struct Args {
     /// Disable recording and ingesting of wireshark captures.
     #[arg(long, default_value_t = false)]
     pub no_capture: bool,
+
+    /// Tags to add to all scenarios in this run.
+    #[arg(long)]
+    pub tags: Vec<String>,
 }
 
 fn main() {
@@ -79,7 +83,15 @@ fn main() {
         repeat,
         filter,
         no_capture,
+        tags,
     } = Args::parse();
+
+    // If a single arg was parsed and it contains commas, split on the commas
+    let tags = if tags.len() == 1 {
+        tags[0].split(',').map(|s| s.trim().to_string()).collect()
+    } else {
+        tags
+    };
 
     if clean {
         log::warn!("Removing all previous dumps");
@@ -99,6 +111,7 @@ fn main() {
     let hostname = hostname();
 
     log::info!("Running tests");
+    log::info!("- Tags: {:?}", tags);
     log::info!("- Hostname: {}", hostname);
     log::info!("- Interface: {} ({})", interface, interface_description);
     log::info!("- Realtime kernel: {}", if is_rt { "yes" } else { "no" });
@@ -166,6 +179,7 @@ fn main() {
                 task_prio,
                 hostname: hostname.clone(),
                 cycle_time_us: *cycle_time_us,
+                tags: tags.clone(),
             };
 
             for _ in 0..repeat {

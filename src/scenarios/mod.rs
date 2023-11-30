@@ -62,6 +62,9 @@ pub struct TestSettings {
 
     /// Cycle time in microseconds.
     pub cycle_time_us: u32,
+
+    /// Optional list of tags the user wants to attach to this set of scenarios.
+    pub tags: Vec<String>,
 }
 
 impl TestSettings {
