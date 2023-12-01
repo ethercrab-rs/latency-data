@@ -66,6 +66,12 @@ pub struct Args {
     /// Tags to add to all scenarios in this run.
     #[arg(long)]
     pub tags: Vec<String>,
+
+    /// Only run specific scenarios.
+    ///
+    /// Filters are disabled when specifying scenarios.
+    #[arg(long, default_values_t = Vec::<String>::new())]
+    pub scenarios: Vec<String>,
 }
 
 fn main() {
@@ -81,9 +87,10 @@ fn main() {
         db,
         clean_db,
         repeat,
-        filter,
+        mut filter,
         no_capture,
         tags,
+        scenarios,
     } = Args::parse();
 
     // If a single arg was parsed and it contains commas, split on the commas
@@ -93,11 +100,28 @@ fn main() {
         tags
     };
 
+    // If a single arg was parsed and it contains commas, split on the commas
+    let scenarios = if scenarios.len() == 1 {
+        scenarios[0]
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect()
+    } else {
+        scenarios
+    };
+
     if clean {
         log::warn!("Removing all previous dumps");
 
         // Ignore errors
         let _ = fs::remove_dir_all(DUMPS_PATH);
+    }
+
+    // Replace any filters with specific scenario names if desired
+    if !scenarios.is_empty() {
+        log::info!("Running specific scenarios: {:?}", scenarios);
+
+        filter = None;
     }
 
     if let Some(filter) = filter.as_ref() {
@@ -110,7 +134,7 @@ fn main() {
     let (tx_usecs, rx_usecs) = ethtool_usecs(&interface);
     let hostname = hostname();
 
-    log::info!("Running tests");
+    log::info!("Running scenarios");
     log::info!("- Tags: {:?}", tags);
     log::info!("- Hostname: {}", hostname);
     log::info!("- Interface: {} ({})", interface, interface_description);
@@ -183,7 +207,9 @@ fn main() {
             };
 
             for _ in 0..repeat {
-                results.extend(run_all(&settings, &filter, no_capture).expect("runs failed"));
+                results.extend(
+                    run_all(&settings, &filter, &scenarios, no_capture).expect("runs failed"),
+                );
             }
         }
     }

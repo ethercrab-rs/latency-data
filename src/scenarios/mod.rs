@@ -152,7 +152,7 @@ async fn loop_tick(group: &mut Group<Op>, client: &Client<'_>) {
 
 #[derive(Debug, Clone)]
 pub struct CycleMetadata {
-    /// Time spent processing TX/RX and process data.
+    /// Time spent processing TX, RX and process data.
     pub processing_time_ns: u32,
 
     /// Time spent waiting for the tick `await` call.
@@ -303,6 +303,7 @@ pub fn dump_path(name: &str) -> PathBuf {
 pub fn run_all(
     settings: &TestSettings,
     filter: &Option<String>,
+    name_filter: &[String],
     no_capture: bool,
 ) -> Result<Vec<(&'static str, RunMetadata)>, ethercrab::error::Error> {
     let scenarios: Vec<(
@@ -323,8 +324,20 @@ pub fn run_all(
     scenarios
         .into_iter()
         .filter_map(|(scenario_fn, scenario_name)| {
+            // Filter by substring
             if let Some(filter) = filter {
                 if scenario_name.contains(filter) {
+                    Some(
+                        run(settings, scenario_fn, &scenario_name, no_capture)
+                            .map(|result| (scenario_name, result)),
+                    )
+                } else {
+                    None
+                }
+            }
+            // Filter by explicit scenario name
+            else if !name_filter.is_empty() {
+                if name_filter.contains(&scenario_name.to_string()) {
                     Some(
                         run(settings, scenario_fn, &scenario_name, no_capture)
                             .map(|result| (scenario_name, result)),
