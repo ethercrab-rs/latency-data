@@ -228,7 +228,7 @@ fn run(
             "-w",
             dump_filename.display().to_string().as_str(),
             "--interface",
-            "enp2s0",
+            &settings.nic,
             "-f",
             "ether proto 0x88a4",
         ]);
