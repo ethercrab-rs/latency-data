@@ -69,6 +69,15 @@ uname -a
 Props to [here](https://www.gnu.org/software/grub/manual/grub/html_node/default.html#default) for
 helping with this.
 
+### Checking threads are running with set priorities
+
+```bash
+top -H -p $(pidof latency-data)
+```
+
+Look at the `PR` column. The number is roughly negative to what is set in the thread prio in Rust,
+see [here](https://superuser.com/a/877353/50512).
+
 ## Hardware
 
 i7-3770
